@@ -1,0 +1,15 @@
+title: quarto-awesomecv-typst
+author: Kazuharu Yanagimoto
+version: 0.3.3
+quarto-required: ">=1.8.0"
+contributes:
+  formats:
+    typst:
+      shortcodes:
+        - input-yaml.lua
+      template-partials:
+        - typst-template.typ
+        - typst-show.typ
+
+source: kazuyanagimoto/quarto-awesomecv-typst@v0.3.3
+source-type: registry

@@ -1,0 +1,103 @@
+name: TenderPulse 4IR Enterprise CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master, release/*]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test-and-validate:
+    name: Run Python 3.11 Enterprise Test Matrix
+    runs-on: ubuntu-latest
+
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Enterprise Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install flake8 pytest pytest-cov
+
+      - name: Lint Codebase & Style Enforcement
+        run: |
+          # Stop build if there are Python syntax errors or undefined names
+          flake8 backend --count --select=E9,F63,F7,F82 --show-source --statistics
+          # Exit-zero treats all errors as warnings
+          flake8 backend --count --exit-zero --max-complexity=15 --max-line-length=127 --statistics
+
+      - name: Verify Phase 1 (Docker & Deployment Hardening)
+        run: python test_phase1_deployment.py
+
+      - name: Verify Phase 2 (SQLAlchemy Persistence & Spatial Indexing)
+        run: python test_phase2_database.py
+
+      - name: Verify Phase 3 (Cryptographic JWT & 3-Tier RBAC)
+        run: python test_phase3_security_rbac.py
+
+      - name: Verify Phase 4 (Cartel Graph & Multi-Vector Forensics)
+        run: python test_phase4_cartel_graph.py
+
+      - name: Verify Phase 5 (Harvester Daemon & Corrigenda)
+        run: python test_phase5_harvester.py
+
+      - name: Verify Phase 6 (Sentinel Hub Process API & Radar Tile Cache)
+        run: python test_phase6_sentinel_cache.py
+
+      - name: Verify Sentinel Spatial GIS
+        run: python test_sentinel_spatial.py
+
+      - name: Launch Backend Server Daemon for E2E Tests
+        run: |
+          python -m uvicorn backend.server:app --host 127.0.0.1 --port 8080 &
+          sleep 4
+          curl -f http://127.0.0.1:8080/api/health
+
+      - name: Run Master Commercial Production Readiness Test
+        run: python test_production_readiness.py
+
+      - name: Run UI and Overview DOM Wiring Checks
+        run: |
+          python test_overview_wiring.py
+          python test_ui_wiring.py
+
+  container-build-verification:
+    name: Docker Multi-Stage Container Build
+    runs-on: ubuntu-latest
+    needs: test-and-validate
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build Application Image (Non-Root UID 1001)
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          tags: tenderpulse-4ir:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Verify Docker Compose Orchestration
+        run: |
+          docker compose config --quiet
+          echo "[✓] docker-compose.yml configuration syntax validated."

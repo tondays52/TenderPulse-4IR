@@ -1,0 +1,126 @@
+[
+  {
+    "id": "eGP-1092811",
+    "tenderId": "eGP-1092811",
+    "agency": "Roads and Highways Department (RHD)",
+    "winner": "Bengal Infra Ltd",
+    "leadContractor": "Bengal Infra Ltd",
+    "estimatedCost": 85000000.0,
+    "bidders": [
+      {
+        "name": "Bengal Infra Ltd",
+        "bid_price": 84500000.0,
+        "bank_guarantee_no": "BG-PRIME-MOT-8812",
+        "registered_address": "Suite 804, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      },
+      {
+        "name": "Shurjo Consortium",
+        "bid_price": 88725000.0,
+        "bank_guarantee_no": "BG-PRIME-MOT-8813",
+        "registered_address": "Suite 804, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      },
+      {
+        "name": "Padma Builders",
+        "bid_price": 89570000.0,
+        "bank_guarantee_no": "BG-PRIME-MOT-8814",
+        "registered_address": "8th Floor, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      }
+    ],
+    "collusionRisk": 0.92,
+    "riskCategory": "CARTEL_RING_IDENTIFIED",
+    "sharedGuarantee": "BG-PRIME-MOT-8812"
+  },
+  {
+    "id": "eGP-1092822",
+    "tenderId": "eGP-1092822",
+    "agency": "Local Government Engineering Department (LGED)",
+    "winner": "Shurjo Consortium",
+    "leadContractor": "Shurjo Consortium",
+    "estimatedCost": 45000000.0,
+    "bidders": [
+      {
+        "name": "Shurjo Consortium",
+        "bid_price": 43200000.0,
+        "bank_guarantee_no": "BG-EBL-DHK-4421",
+        "registered_address": "Suite 804, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      },
+      {
+        "name": "Bengal Infra Ltd",
+        "bid_price": 46440000.0,
+        "bank_guarantee_no": "BG-EBL-DHK-4422",
+        "registered_address": "Suite 804, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      },
+      {
+        "name": "Padma Builders",
+        "bid_price": 47250000.0,
+        "bank_guarantee_no": "BG-EBL-DHK-4423",
+        "registered_address": "8th Floor, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      }
+    ],
+    "collusionRisk": 0.92,
+    "riskCategory": "CARTEL_RING_IDENTIFIED",
+    "sharedGuarantee": "BG-EBL-DHK-4421"
+  },
+  {
+    "id": "eGP-1092833",
+    "tenderId": "eGP-1092833",
+    "agency": "Roads and Highways Department (RHD)",
+    "winner": "Padma Builders",
+    "leadContractor": "Padma Builders",
+    "estimatedCost": 65000000.0,
+    "bidders": [
+      {
+        "name": "Padma Builders",
+        "bid_price": 63800000.0,
+        "bank_guarantee_no": "BG-CITY-MOT-9101",
+        "registered_address": "8th Floor, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      },
+      {
+        "name": "Bengal Infra Ltd",
+        "bid_price": 68250000.0,
+        "bank_guarantee_no": "BG-CITY-MOT-9102",
+        "registered_address": "Suite 804, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      },
+      {
+        "name": "Shurjo Consortium",
+        "bid_price": 69100000.0,
+        "bank_guarantee_no": "BG-CITY-MOT-9103",
+        "registered_address": "Suite 804, Sena Kalyan Bhaban, Motijheel, Dhaka"
+      }
+    ],
+    "collusionRisk": 0.92,
+    "riskCategory": "CARTEL_RING_IDENTIFIED",
+    "sharedGuarantee": "BG-CITY-MOT-9101"
+  },
+  {
+    "id": "eGP-1092844",
+    "tenderId": "eGP-1092844",
+    "agency": "Bangladesh Water Development Board (BWDB)",
+    "winner": "National Tech Builders",
+    "leadContractor": "National Tech Builders",
+    "estimatedCost": 12000000.0,
+    "bidders": [
+      {
+        "name": "National Tech Builders",
+        "bid_price": 11200000.0,
+        "bank_guarantee_no": "BG-DHAKA-1082",
+        "registered_address": "Plot 14, Kawran Bazar, Dhaka"
+      },
+      {
+        "name": "Apex Engineering",
+        "bid_price": 11450000.0,
+        "bank_guarantee_no": "BG-DHAKA-1099",
+        "registered_address": "House 42, Road 11, Banani, Dhaka"
+      },
+      {
+        "name": "Delta Works",
+        "bid_price": 12100000.0,
+        "bank_guarantee_no": "BG-ISLAMI-5501",
+        "registered_address": "Level 4, Agrabad C/A, Chittagong"
+      }
+    ],
+    "collusionRisk": 0.92,
+    "riskCategory": "CARTEL_RING_IDENTIFIED",
+    "sharedGuarantee": "BG-DHAKA-1082"
+  }
+]

@@ -1,0 +1,56 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tenderpulse_app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - SH_CLIENT_ID=${SH_CLIENT_ID:-}
+      - SH_CLIENT_SECRET=${SH_CLIENT_SECRET:-}
+      - SH_INSTANCE_ID=${SH_INSTANCE_ID:-01a74708-c309-40e7-aacd-e69298313ecc}
+      - REDIS_URL=redis://redis:6379/0
+    volumes:
+      - ./data:/app/data
+    networks:
+      - tenderpulse_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  nginx:
+    image: nginx:alpine
+    container_name: tenderpulse_nginx
+    restart: unless-stopped
+    ports:
+      - "${HOST_PORT:-8080}:80"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - tenderpulse_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: tenderpulse_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - tenderpulse_net
+
+networks:
+  tenderpulse_net:
+    driver: bridge
+
+volumes:
+  redis_data:
+    driver: local

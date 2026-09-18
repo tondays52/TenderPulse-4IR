@@ -1,0 +1,66 @@
+{
+  "currency": "BDT",
+  "gatewayMode": "SANDBOX_SIMULATION",
+  "providers": {
+    "bkash": {
+      "enabled": true,
+      "merchantShortCode": "017XXXXXXXX",
+      "appKey": "bkash_live_app_key_demo",
+      "callbackUrl": "https://tenderpulse.gov.bd/api/billing/bkash/callback",
+      "notes": "Instant automated tokenized payment gateway with instant license activation."
+    },
+    "nagad": {
+      "enabled": true,
+      "merchantId": "NAGAD_TENDERPULSE_01",
+      "publicKey": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA...",
+      "callbackUrl": "https://tenderpulse.gov.bd/api/billing/nagad/callback"
+    },
+    "bank_eft": {
+      "enabled": true,
+      "accountName": "TenderPulse Intelligence Systems Ltd.",
+      "bankName": "Prime Bank PLC",
+      "routingNumber": "170261234",
+      "accountNumber": "2104311002341"
+    }
+  },
+  "tiers": {
+    "free": {
+      "id": "tier-free",
+      "name": "Standard Access",
+      "priceMonthly": 0,
+      "features": [
+        "Live 24/7 Procurement Feed (10 notices/day)",
+        "Basic CPTU PPR-2008 Capacity Calculator",
+        "Public Gazettes & Newspaper Summaries"
+      ]
+    },
+    "pro": {
+      "id": "tier-pro",
+      "name": "Pro Contractor",
+      "priceMonthly": 4999,
+      "badge": "MOST POPULAR",
+      "features": [
+        "Unlimited Live e-GP Mining Notices",
+        "AI Tender Data Sheet (TDS) Auditor",
+        "AI BOQ Cartel & Syndicate Trap Radar",
+        "1-Click Smart STD Legal PDF Generation",
+        "Instant WhatsApp & SMS Alerts (1 Number)"
+      ]
+    },
+    "enterprise": {
+      "id": "tier-enterprise",
+      "name": "Enterprise Consortium",
+      "priceMonthly": 14999,
+      "badge": "DELTEK GRADE",
+      "features": [
+        "All Pro Features Included",
+        "Historical Award Database ('Who Won?')",
+        "Competitor Dossiers & Disqualification Autopsies",
+        "AI Winning Bid Price & Margin Predictor",
+        "1-Click Bank Credit Line Pre-Approval Hub",
+        "Multi-User Team Access (Up to 5 Engineers)",
+        "Priority WhatsApp Alerts (Unlimited Numbers)"
+      ]
+    }
+  }
+}

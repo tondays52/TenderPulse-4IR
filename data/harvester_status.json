@@ -1,0 +1,21 @@
+{
+  "status": "idle",
+  "cycle_count": 1,
+  "total_harvested_count": 35,
+  "corrigendum_count": 14,
+  "current_agency": null,
+  "last_harvest_time": "2026-09-18T12:36:06.296496Z",
+  "next_scheduled_run": null,
+  "last_error": null,
+  "proxy_active": false,
+  "agencies": [
+    "RHD",
+    "LGED",
+    "PWD",
+    "BWDB",
+    "BREB",
+    "EED",
+    "DGHS"
+  ],
+  "recent_corrigenda": []
+}

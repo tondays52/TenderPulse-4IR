@@ -1,0 +1,36 @@
+{
+  "notifications": {
+    "enabled": true,
+    "targetPhone": "+88018XXXXXXXX",
+    "providers": {
+      "whatsapp_callmebot": {
+        "enabled": true,
+        "description": "Free direct WhatsApp dispatch to personal phone (No credit card or Twilio account needed)",
+        "phone": "+88018XXXXXXXX",
+        "apiKey": "PASTE_CALLMEBOT_APIKEY_HERE",
+        "docUrl": "https://www.callmebot.com/blog/free-api-whatsapp-messages/"
+      },
+      "twilio_whatsapp_sms": {
+        "enabled": false,
+        "description": "Twilio Programmable SMS & WhatsApp API",
+        "accountSid": "YOUR_TWILIO_ACCOUNT_SID",
+        "authToken": "YOUR_TWILIO_AUTH_TOKEN",
+        "fromWhatsApp": "whatsapp:+14155238886",
+        "fromSms": "+1234567890",
+        "toPhone": "+88018XXXXXXXX"
+      },
+      "greenweb_bd_sms": {
+        "enabled": false,
+        "description": "Bangladesh Local SMS Gateway (Greenweb / Alpha SMS)",
+        "token": "YOUR_GREENWEB_API_TOKEN",
+        "toPhone": "+88018XXXXXXXX"
+      },
+      "telegram_instant_push": {
+        "enabled": false,
+        "description": "Free Telegram push alerts to your phone",
+        "botToken": "YOUR_TELEGRAM_BOT_TOKEN",
+        "chatId": "YOUR_TELEGRAM_CHAT_ID"
+      }
+    }
+  }
+}

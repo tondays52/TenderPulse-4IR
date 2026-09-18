@@ -1,0 +1,10 @@
+title: Black-formatter
+author: Shafayet Khan Shafee
+version: 1.1.1
+quarto-required: ">=1.2.0"
+contributes:
+  filters:
+    - black-formatter.lua
+
+source: shafayetshafee/black-formatter@v1.1.1
+source-type: registry

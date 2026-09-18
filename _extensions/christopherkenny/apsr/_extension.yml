@@ -1,0 +1,33 @@
+title: APSR
+author: Christopher T. Kenny
+version: 1.0.3
+quarto-required: ">=1.5.0"
+contributes:
+  formats:
+    common:
+      toc: false
+      filters:
+        - at: pre-ast
+          path: floatnote.lua
+        - at: post-quarto
+          path: wordcount.lua
+      pdf-engine: pdflatex
+    pdf:
+      documentclass: apsr_submission
+      include-in-header: header.tex
+      template-partials:
+        - "partials/before-body.tex"
+        - "partials/title.tex"
+        - "partials/doc-class.tex"
+      format-resources:
+        - "apsr_submission.cls"
+        - "chicago-apsr.bst"
+      cite-method: natbib
+      biblio-config: false
+    html:
+      number-sections: false
+      toc: false
+      # Use a CSL file to style (https://www.zotero.org/styles/)
+      csl: https://www.zotero.org/styles/american-political-science-review
+source: christopherkenny/apsr@v1.0.3
+source-type: registry
