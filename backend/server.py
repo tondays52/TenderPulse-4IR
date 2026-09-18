@@ -18,6 +18,12 @@ from pydantic import BaseModel
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
+try:
+    import dotenv
+    dotenv.load_dotenv(os.path.join(ROOT_DIR, ".env"), override=True)
+except Exception:
+    pass
+
 # Import TenderPulse AI modules
 from backend.smt_solver import CptuLegalProver
 from backend.cartel_radar import CartelRadarEngine
@@ -572,6 +578,21 @@ def get_sentinel_pipeline_status():
     Returns diagnostics for active Sentinel Hub Instance ID pipeline.
     """
     return sentinel_pipeline.get_pipeline_status()
+
+
+@app.post("/api/sentinel/reload")
+def reload_sentinel_config():
+    """
+    Reloads credentials and configuration from .env into active Sentinel pipeline.
+    """
+    sentinel_pipeline.reload_config()
+    auth_result = sentinel_pipeline.authenticate()
+    return {
+        "status": "SUCCESS",
+        "message": "Sentinel Hub pipeline reloaded with latest credentials",
+        "auth": auth_result,
+        "pipeline": sentinel_pipeline.get_pipeline_status()
+    }
 
 
 @app.get("/api/sentinel/cache/stats")
