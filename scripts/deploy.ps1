@@ -16,13 +16,13 @@ Write-Host "==========================================================" -Foregro
 
 if ($Down) {
     Write-Host "[*] Stopping and removing active containers..." -ForegroundColor Yellow
-    docker-compose down
+    docker compose down
     Write-Host "[+] Containers stopped successfully." -ForegroundColor Green
     exit 0
 }
 
 if ($Logs) {
-    docker-compose logs -f
+    docker compose logs -f
     exit 0
 }
 
@@ -38,7 +38,7 @@ if (-not (Test-Path "data")) {
 }
 
 Write-Host "[*] Building Docker images..." -ForegroundColor Yellow
-docker-compose build
+docker compose build
 
 if ($BuildOnly) {
     Write-Host "[+] Build completed successfully (--BuildOnly specified)." -ForegroundColor Green
@@ -46,7 +46,8 @@ if ($BuildOnly) {
 }
 
 Write-Host "[*] Starting production stack (App + Nginx + Redis)..." -ForegroundColor Yellow
-docker-compose up -d
+docker compose up -d
+
 
 Write-Host "[*] Waiting for application health check..." -ForegroundColor Yellow
 Start-Sleep -Seconds 5
@@ -62,5 +63,5 @@ try {
         Write-Host "[!] Unexpected status: $($health.status)" -ForegroundColor Red
     }
 } catch {
-    Write-Host "[!] Health check failed to respond within 10 seconds. Check logs with: docker-compose logs" -ForegroundColor Red
+    Write-Host "[!] Health check failed to respond within 10 seconds. Check logs with: docker compose logs" -ForegroundColor Red
 }

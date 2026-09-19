@@ -101,13 +101,14 @@ def test_deployment_scripts():
     
     with open(ps_script, "r", encoding="utf-8") as f:
         ps_content = f.read()
-    assert "docker-compose build" in ps_content, "deploy.ps1 must trigger docker-compose build"
+    assert "docker compose build" in ps_content or "docker-compose build" in ps_content, "deploy.ps1 must trigger docker compose build"
     assert "Invoke-RestMethod" in ps_content, "deploy.ps1 must poll healthcheck"
     
     with open(sh_script, "r", encoding="utf-8") as f:
         sh_content = f.read()
-    assert "docker-compose build" in sh_content, "deploy.sh must trigger docker-compose build"
+    assert "docker compose build" in sh_content or "docker-compose build" in sh_content, "deploy.sh must trigger docker compose build"
     print("  [PASS] Cross-platform deployment scripts (PowerShell & Bash) verified.")
+
 
 if __name__ == "__main__":
     print("=================================================================")
