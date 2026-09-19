@@ -61,6 +61,25 @@ class BangladeshGisHeatmap {
       MODERATE: "#06b6d4",
       CLEAN: "#10b981"
     };
+
+    // Live WebSocket Stream State
+    this.ws = null;
+    this._wsReconnectDelay = 2000;
+    this._wsRetries = 0;
+    this._wsMaxRetries = 20;
+    this.liveEnabled = true;
+
+    // Active Sonar Blip Particles
+    this.activeBlips = [];
+
+    // Live Ticker History (last 4 events)
+    this.liveTickerEvents = [];
+    this.liveTotalEvents = 0;
+    this.liveCollusiveCount = 0;
+
+    // Audio Engine
+    this._audioCtx = null;
+    this._audioMuted = true;  // default: muted (browser autoplay policy)
   }
 
   init() {
@@ -75,6 +94,8 @@ class BangladeshGisHeatmap {
     this.attachEventListeners();
     this.loadHeatmapData();
     this.startAnimationLoop();
+    this.buildLiveTicker();
+    this.connectLiveStream();
   }
 
   resize() {
@@ -314,6 +335,9 @@ class BangladeshGisHeatmap {
     if (this.hoveredDistrict && this.hoveredDistrict !== this.selectedDistrict) {
       this.renderTooltip(ctx, this.hoveredDistrict);
     }
+
+    // 8. Live Sonar Blip Particles
+    this.renderLiveBlips(ctx);
   }
 
   renderCoordinateGrid(ctx) {
@@ -717,6 +741,355 @@ window.initBangladeshGisHeatmap = function() {
 };
 
 window.switchCartelViewport = function(mode) {
+  connectLiveStream() {
+    if (!this.liveEnabled || this._wsRetries >= this._wsMaxRetries) return;
+    const proto = window.location.protocol === "https:" ? "wss" : "ws";
+    const url = `${proto}://127.0.0.1:8080/api/ws/cartel/live`;
+    try {
+      this.ws = new WebSocket(url);
+    } catch (e) {
+      this._scheduleWsReconnect();
+      return;
+    }
+
+    this.ws.onopen = () => {
+      this._wsRetries = 0;
+      this._wsReconnectDelay = 2000;
+      this._updateTickerBadge(true);
+      console.log("[GisLive] WebSocket connected to live tender stream.");
+    };
+
+    this.ws.onmessage = (ev) => {
+      try {
+        const event = JSON.parse(ev.data);
+        this.onLiveEvent(event);
+      } catch (_) {}
+    };
+
+    this.ws.onclose = () => {
+      this._updateTickerBadge(false);
+      this._scheduleWsReconnect();
+    };
+
+    this.ws.onerror = () => {
+      this._updateTickerBadge(false);
+    };
+  }
+
+  _scheduleWsReconnect() {
+    if (!this.liveEnabled || this._wsRetries >= this._wsMaxRetries) return;
+    this._wsRetries++;
+    this._wsReconnectDelay = Math.min(30000, this._wsReconnectDelay * 1.5);
+    setTimeout(() => this.connectLiveStream(), this._wsReconnectDelay);
+  }
+
+  onLiveEvent(event) {
+    if (event.event_type === "STREAM_CONNECTED" || event.event_type === "PONG") return;
+
+    const lat = event.latitude;
+    const lon = event.longitude;
+    if (!lat || !lon) return;
+
+    this.liveTotalEvents++;
+    if (event.is_collusive) this.liveCollusiveCount++;
+
+    // Spawn blip particle
+    this.spawnBlip(lat, lon, event);
+
+    // Update district data in-memory for live counts
+    const dist = this.districts.find(d => d.district === event.district);
+    if (dist) {
+      dist.total_packages = (dist.total_packages || 0) + 1;
+      dist.total_volume_cr = (dist.total_volume_cr || 0) + (event.estimated_cost_cr || 0);
+      if (event.is_collusive) {
+        dist.collusive_packages = (dist.collusive_packages || 0) + 1;
+        dist.collusive_volume_cr = (dist.collusive_volume_cr || 0) + (event.estimated_cost_cr || 0);
+      }
+    }
+
+    // Spawn partner arc flares
+    if (event.is_collusive && event.partner_districts && event.partner_districts.length) {
+      event.partner_districts.forEach(partnerName => {
+        const partner = this.districts.find(d => d.district === partnerName);
+        if (partner) {
+          this.spawnArcFlare(lat, lon, partner.latitude, partner.longitude, event);
+        }
+      });
+    }
+
+    // Push to ticker
+    this.liveTickerEvents.unshift(event);
+    if (this.liveTickerEvents.length > 4) this.liveTickerEvents.pop();
+    this.renderLiveTickerEvents();
+
+    // Audio ping
+    if (!this._audioMuted) this._pingSound(event.is_collusive);
+  }
+
+  spawnBlip(lat, lon, event) {
+    const color = this.tierColors[event.threat_tier] || "#94a3b8";
+    this.activeBlips.push({
+      lat, lon,
+      maxRadius: event.threat_tier === "CRITICAL" ? 80 : event.threat_tier === "HIGH" ? 60 : 40,
+      currentRadius: 4,
+      alpha: 1.0,
+      color,
+      isCollusive: event.is_collusive,
+      label: event.district,
+      eventType: event.event_type,
+    });
+    // Cap particle count
+    if (this.activeBlips.length > 30) this.activeBlips.shift();
+  }
+
+  _arcFlares = [];
+
+  spawnArcFlare(lat1, lon1, lat2, lon2, event) {
+    const color = this.tierColors[event.threat_tier] || "#f97316";
+    this._arcFlares.push({
+      lat1, lon1, lat2, lon2,
+      color,
+      progress: 0,
+      alpha: 1.0,
+    });
+    if (this._arcFlares.length > 12) this._arcFlares.shift();
+  }
+
+  renderLiveBlips(ctx) {
+    const dt = 0.028;  // tick advance per frame
+
+    // Render & age arc flares
+    this._arcFlares = this._arcFlares.filter(f => f.alpha > 0.01);
+    for (const f of this._arcFlares) {
+      const p1 = this.geoToScreen(f.lat1, f.lon1);
+      const p2 = this.geoToScreen(f.lat2, f.lon2);
+      const cpx = (p1.x + p2.x) / 2;
+      const cpy = Math.min(p1.y, p2.y) - 40;
+
+      // Animated photon along arc
+      const t = f.progress;
+      const px = (1-t)*(1-t)*p1.x + 2*(1-t)*t*cpx + t*t*p2.x;
+      const py = (1-t)*(1-t)*p1.y + 2*(1-t)*t*cpy + t*t*p2.y;
+
+      ctx.save();
+      ctx.globalAlpha = f.alpha;
+      // Arc line
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.quadraticCurveTo(cpx, cpy, p2.x, p2.y);
+      ctx.strokeStyle = f.color;
+      ctx.lineWidth = 1.2;
+      ctx.shadowColor = f.color;
+      ctx.shadowBlur = 6;
+      ctx.setLineDash([4, 6]);
+      ctx.stroke();
+      // Photon particle
+      ctx.beginPath();
+      ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.shadowColor = f.color;
+      ctx.shadowBlur = 12;
+      ctx.fill();
+      ctx.restore();
+
+      f.progress = Math.min(1, f.progress + dt * 1.2);
+      if (f.progress >= 1) f.alpha -= 0.04;
+    }
+
+    // Render & age sonar blip rings
+    this.activeBlips = this.activeBlips.filter(b => b.alpha > 0.02);
+    for (const blip of this.activeBlips) {
+      const pt = this.geoToScreen(blip.lat, blip.lon);
+      ctx.save();
+
+      // Three concentric expanding rings
+      for (let ring = 0; ring < 3; ring++) {
+        const ringR = blip.currentRadius * (1 - ring * 0.25);
+        if (ringR <= 0) continue;
+        const ringAlpha = blip.alpha * (1 - ring * 0.3);
+        ctx.globalAlpha = ringAlpha;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, ringR, 0, Math.PI * 2);
+        ctx.strokeStyle = blip.color;
+        ctx.lineWidth = 1.5 - ring * 0.4;
+        ctx.shadowColor = blip.color;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+      }
+
+      // Injected award: extra solid fill flash
+      if (blip.eventType === "INJECTED_AWARD") {
+        ctx.globalAlpha = blip.alpha * 0.25;
+        ctx.beginPath();
+        ctx.arc(pt.x, pt.y, blip.currentRadius * 0.5, 0, Math.PI * 2);
+        ctx.fillStyle = blip.color;
+        ctx.fill();
+      }
+
+      ctx.restore();
+
+      // Advance
+      blip.currentRadius = Math.min(blip.maxRadius, blip.currentRadius + dt * blip.maxRadius * 0.7);
+      if (blip.currentRadius >= blip.maxRadius * 0.7) {
+        blip.alpha -= dt * 0.8;
+      }
+    }
+  }
+
+  // ──────────────────────────────────────────────
+  // Live Ticker HUD
+  // ──────────────────────────────────────────────
+  buildLiveTicker() {
+    const container = document.getElementById("gisDistrictMapContainer");
+    if (!container || document.getElementById("gisLiveTicker")) return;
+
+    const ticker = document.createElement("div");
+    ticker.id = "gisLiveTicker";
+    ticker.style.cssText = [
+      "position:relative", "width:100%", "background:rgba(2,6,23,0.85)",
+      "border-bottom:1px solid rgba(239,68,68,0.25)",
+      "padding:6px 14px", "display:flex", "align-items:center", "gap:12px",
+      "font-family:'JetBrains Mono',monospace", "font-size:11px", "z-index:10",
+      "flex-wrap:wrap",
+    ].join(";");
+
+    ticker.innerHTML = `
+      <span id="gisLiveBadge" style="display:inline-flex;align-items:center;gap:5px;color:#ef4444;font-weight:700;">
+        <span id="gisLiveDot" style="width:7px;height:7px;border-radius:50%;background:#ef4444;animation:gisLivePulse 1s infinite;"></span>
+        <span id="gisLiveBadgeText">🔴 CONNECTING…</span>
+      </span>
+      <span id="gisLiveStats" style="color:#64748b;">— events</span>
+      <span style="flex:1;"></span>
+      <button id="gisLiveToggleBtn" style="background:rgba(30,41,59,0.8);border:1px solid rgba(100,116,139,0.4);color:#94a3b8;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;">⏸ Pause</button>
+      <button id="gisLiveInjectBtn" style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.5);color:#f87171;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;">⚡ Inject Anomaly</button>
+      <button id="gisLiveAudioBtn" style="background:rgba(30,41,59,0.8);border:1px solid rgba(100,116,139,0.4);color:#64748b;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:10px;font-family:inherit;">🔇 Audio</button>
+    `;
+
+    // Inject CSS keyframe for badge pulse
+    if (!document.getElementById("gisLiveStyles")) {
+      const style = document.createElement("style");
+      style.id = "gisLiveStyles";
+      style.textContent = `
+        @keyframes gisLivePulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.4;transform:scale(1.6)} }
+        .gis-live-pill { display:inline-flex;align-items:center;gap:5px;padding:2px 8px;border-radius:12px;font-size:10px; }
+        .gis-live-pill-clean { background:rgba(16,185,129,0.12);border:1px solid rgba(16,185,129,0.35);color:#10b981; }
+        .gis-live-pill-alert { background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.4);color:#f87171; }
+        .gis-live-pill-elevated { background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.35);color:#f59e0b; }
+      `;
+      document.head.appendChild(style);
+    }
+
+    // Insert before canvas
+    const canvas = container.querySelector(`#${this.canvasId}`);
+    if (canvas) {
+      container.insertBefore(ticker, canvas);
+    } else {
+      container.prepend(ticker);
+    }
+
+    // Event row container below ticker
+    const evRow = document.createElement("div");
+    evRow.id = "gisLiveEventRow";
+    evRow.style.cssText = [
+      "display:flex", "gap:6px", "padding:4px 14px", "overflow:hidden",
+      "background:rgba(2,6,23,0.7)", "min-height:28px", "align-items:center",
+      "font-family:'JetBrains Mono',monospace", "font-size:10px", "flex-wrap:wrap",
+    ].join(";");
+    evRow.innerHTML = `<span style="color:#334155;">Awaiting live e-GP tender stream…</span>`;
+    if (canvas) container.insertBefore(evRow, canvas); else container.prepend(evRow);
+
+    // Wire buttons
+    document.getElementById("gisLiveToggleBtn").addEventListener("click", () => this._toggleStream());
+    document.getElementById("gisLiveInjectBtn").addEventListener("click", () => this._injectAnomaly());
+    document.getElementById("gisLiveAudioBtn").addEventListener("click", () => this._toggleAudio());
+  }
+
+  _updateTickerBadge(connected) {
+    const badge = document.getElementById("gisLiveBadgeText");
+    const dot = document.getElementById("gisLiveDot");
+    if (badge) badge.textContent = connected ? "🔴 LIVE RADAR" : "⚫ RECONNECTING…";
+    if (dot) dot.style.background = connected ? "#ef4444" : "#475569";
+  }
+
+  renderLiveTickerEvents() {
+    const row = document.getElementById("gisLiveEventRow");
+    const stats = document.getElementById("gisLiveStats");
+    if (!row) return;
+    if (stats) stats.textContent = `${this.liveTotalEvents} events | ${this.liveCollusiveCount} collusion flags`;
+
+    const pills = this.liveTickerEvents.map(ev => {
+      const tierKey = ev.threat_tier || "CLEAN";
+      const cls = tierKey === "CRITICAL" || tierKey === "HIGH"
+        ? "gis-live-pill-alert"
+        : tierKey === "ELEVATED" ? "gis-live-pill-elevated" : "gis-live-pill-clean";
+      const icon = ev.is_collusive ? "🚨" : "✅";
+      const syn = ev.syndicate ? `·${ev.syndicate.split(" ")[0]}` : "";
+      return `<span class="gis-live-pill ${cls}">${icon} ${ev.district} [${ev.agency}] ৳${ev.estimated_cost_cr}Cr${syn}</span>`;
+    }).join("");
+    row.innerHTML = pills || `<span style="color:#334155;">Awaiting live e-GP tender stream…</span>`;
+  }
+
+  async _toggleStream() {
+    try {
+      const token = window.TenderApiService ? window.TenderApiService.token : null;
+      if (!token) return;
+      const res = await fetch("/api/cartel/live/toggle", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const data = await res.json();
+      const btn = document.getElementById("gisLiveToggleBtn");
+      if (btn) btn.textContent = data.stream_state === "PAUSED" ? "▶ Resume" : "⏸ Pause";
+    } catch (_) {}
+  }
+
+  async _injectAnomaly() {
+    try {
+      const token = window.TenderApiService ? window.TenderApiService.token : null;
+      if (!token) return;
+      // High-threat Dhaka cartel injection
+      await fetch("/api/cartel/live/inject", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          district: "Dhaka", division: "Dhaka", agency: "RHD",
+          estimated_cost_cr: 98.5, work_type: "Road Pavement & Embankment",
+          latitude: 23.8103, longitude: 90.4125
+        })
+      });
+    } catch (_) {}
+  }
+
+  _toggleAudio() {
+    this._audioMuted = !this._audioMuted;
+    const btn = document.getElementById("gisLiveAudioBtn");
+    if (btn) btn.textContent = this._audioMuted ? "🔇 Audio" : "🔊 Audio";
+    if (!this._audioMuted && !this._audioCtx) {
+      try { this._audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {}
+    }
+  }
+
+  _pingSound(isCollusive) {
+    try {
+      if (!this._audioCtx) return;
+      const osc = this._audioCtx.createOscillator();
+      const gain = this._audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(this._audioCtx.destination);
+      osc.frequency.value = isCollusive ? 330 : 880;
+      osc.type = isCollusive ? "sawtooth" : "sine";
+      gain.gain.setValueAtTime(0.08, this._audioCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, this._audioCtx.currentTime + 0.35);
+      osc.start(this._audioCtx.currentTime);
+      osc.stop(this._audioCtx.currentTime + 0.35);
+    } catch (_) {}
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Viewport Switcher (external API)
+// ---------------------------------------------------------------------------
+window.switchCartelViewport = function (mode) {
   const topo = document.getElementById("gatCartelRadarContainer");
   const gis = document.getElementById("gisDistrictMapContainer");
   const btnTopo = document.getElementById("btnViewGatTopology");

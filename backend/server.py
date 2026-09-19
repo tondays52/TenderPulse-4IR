@@ -11,6 +11,7 @@ import json
 import time
 from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
+from fastapi.websockets import WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, StreamingResponse
@@ -39,6 +40,7 @@ from backend.copilot_engine import tender_copilot_engine, CopilotQueryRequest
 from backend.decision_engine import bid_decision_engine, DecisionEvaluationRequest
 from backend.sentinel_hub import sentinel_pipeline
 from backend.harvester_daemon import get_daemon_instance, HarvesterDaemon
+from backend.live_ingestion import live_broadcaster
 from backend.report_exporter import (
     generate_cartel_excel_report,
     generate_cartel_pdf_report,
@@ -70,8 +72,20 @@ except Exception as dbe:
 app = FastAPI(
     title="TenderPulse 4IR AI Backend",
     description="Autonomous e-GP Data Mining & Neuro-Symbolic Procurement Intelligence API",
-    version="2.7.0"
+    version="2.8.0"
 )
+
+
+@app.on_event("startup")
+async def _on_startup():
+    """Auto-start the live e-GP tender broadcast stream on server startup."""
+    live_broadcaster.start()
+
+
+@app.on_event("shutdown")
+async def _on_shutdown():
+    """Gracefully stop the live broadcast stream."""
+    live_broadcaster.stop()
 
 # Enable CORS for file:/// browser origins and local servers
 app.add_middleware(
@@ -1096,6 +1110,81 @@ def serve_index():
     if os.path.exists(index_path):
         return FileResponse(index_path)
     return {"status": "ONLINE", "message": "Di-Tender 4IR AI Backend is Running"}
+
+
+# ---------------------------------------------------------------------------
+# Real-Time Live e-GP Tender Ingestion & WebSocket Endpoints
+# ---------------------------------------------------------------------------
+
+@app.websocket("/api/ws/cartel/live")
+async def ws_cartel_live(websocket: WebSocket):
+    """
+    WebSocket endpoint streaming live e-GP tender award events with instant
+    GAT Cartel Radar classification to all connected GIS canvas clients.
+    """
+    await live_broadcaster.connect(websocket)
+    try:
+        # Keep connection alive; client can send pings/control messages
+        while True:
+            try:
+                msg = await websocket.receive_text()
+                # Echo back control acknowledgements
+                if msg == "PING":
+                    await websocket.send_text('{"event_type":"PONG"}')
+                elif msg == "STATUS":
+                    await websocket.send_text(
+                        json.dumps({"event_type": "STATUS", **live_broadcaster.get_status()})
+                    )
+            except WebSocketDisconnect:
+                break
+            except Exception:
+                break
+    finally:
+        live_broadcaster.disconnect(websocket)
+
+
+@app.post("/api/cartel/live/toggle")
+async def toggle_live_stream(
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_AUDITOR, ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_ADMIN]))
+):
+    """Pause or resume the background live e-GP tender ingestion stream."""
+    new_state = live_broadcaster.toggle()
+    return {"stream_state": new_state, **live_broadcaster.get_status()}
+
+
+@app.get("/api/cartel/live/status")
+async def get_live_stream_status(
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_AUDITOR, ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_ADMIN]))
+):
+    """Return current live stream health, connected client count, and recent events."""
+    return live_broadcaster.get_status()
+
+
+class LiveInjectRequest(BaseModel):
+    district: str = "Dhaka"
+    division: str = "Dhaka"
+    agency: str = "RHD"
+    estimated_cost_cr: float = 50.0
+    work_type: str = "Road Pavement & Embankment"
+    latitude: float = 23.8103
+    longitude: float = 90.4125
+    is_collusive: Optional[bool] = None
+    syndicate: Optional[str] = None
+    threat_tier: Optional[str] = None
+
+
+@app.post("/api/cartel/live/inject")
+async def inject_live_tender(
+    payload: LiveInjectRequest,
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_AUDITOR, ROLE_ADMIN, ROLE_ANALYST, ROLE_EXECUTIVE]))
+):
+    """
+    Inject a custom tender award event into the live stream immediately.
+    Useful for testing canvas sonar blips, collusion arc flares, and QA.
+    """
+    override = payload.dict(exclude_none=True)
+    event = await live_broadcaster.inject(override)
+    return {"injected": True, "event": event}
 
 
 # Mount static assets (CSS, JS, Data)
