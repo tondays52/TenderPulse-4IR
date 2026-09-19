@@ -793,3 +793,327 @@ class CartelRadarEngine:
                 ]
             }
         ]
+
+    def get_district_geospatial_heatmap(
+        self,
+        db,
+        agency: Optional[str] = None,
+        year: Optional[Any] = None,
+        division: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Aggregates multi-year historical awards across all 64 administrative districts of Bangladesh.
+        Returns precision geospatial coordinates, integrity scores, threat tiers, and cross-district cartel tentacles.
+        """
+        from backend.models import HistoricalAwardModel, BiddingSyndicateModel
+        from sqlalchemy import func, case
+
+        cache_key = f"{agency}_{year}_{division}"
+        if not hasattr(self, "_cached_heatmap"):
+            self._cached_heatmap = {}
+        if cache_key in self._cached_heatmap:
+            return self._cached_heatmap[cache_key]
+
+        # Base query
+        q = db.query(
+            HistoricalAwardModel.district,
+            HistoricalAwardModel.division,
+            func.count(HistoricalAwardModel.id).label("total_packages"),
+            func.sum(HistoricalAwardModel.winning_price).label("total_volume"),
+            func.sum(case((HistoricalAwardModel.has_collusion_flag == True, 1), else_=0)).label("collusive_packages"),
+            func.sum(case((HistoricalAwardModel.has_collusion_flag == True, HistoricalAwardModel.winning_price), else_=0)).label("collusive_volume")
+        )
+
+        if agency and agency != "All":
+            q = q.filter(HistoricalAwardModel.agency == agency)
+        if year and str(year) != "All":
+            try:
+                q = q.filter(HistoricalAwardModel.year == int(year))
+            except ValueError:
+                pass
+        if division and division != "All":
+            q = q.filter(HistoricalAwardModel.division == division)
+
+        rows = q.group_by(HistoricalAwardModel.district, HistoricalAwardModel.division).all()
+
+        # Build district stats lookup
+        district_data_map = {}
+        for r in rows:
+            dist = r.district
+            district_data_map[dist] = {
+                "division": r.division,
+                "total_packages": r.total_packages or 0,
+                "total_volume": float(r.total_volume or 0.0),
+                "collusive_packages": int(r.collusive_packages or 0),
+                "collusive_volume": float(r.collusive_volume or 0.0)
+            }
+
+        # Query syndicates active per district
+        syn_q = db.query(
+            HistoricalAwardModel.district,
+            HistoricalAwardModel.syndicate_name,
+            HistoricalAwardModel.collusion_vector,
+            func.count(HistoricalAwardModel.id).label("syn_cnt")
+        ).filter(
+            HistoricalAwardModel.has_collusion_flag == True,
+            HistoricalAwardModel.syndicate_name.isnot(None)
+        )
+        if agency and agency != "All":
+            syn_q = syn_q.filter(HistoricalAwardModel.agency == agency)
+        if year and str(year) != "All":
+            try:
+                syn_q = syn_q.filter(HistoricalAwardModel.year == int(year))
+            except ValueError:
+                pass
+        if division and division != "All":
+            syn_q = syn_q.filter(HistoricalAwardModel.division == division)
+
+        syn_rows = syn_q.group_by(
+            HistoricalAwardModel.district,
+            HistoricalAwardModel.syndicate_name,
+            HistoricalAwardModel.collusion_vector
+        ).all()
+
+        district_syndicates = {}
+        district_vectors = {}
+        for d_name, s_name, vec, cnt in syn_rows:
+            if d_name not in district_syndicates:
+                district_syndicates[d_name] = []
+                district_vectors[d_name] = {}
+            if s_name and s_name not in district_syndicates[d_name]:
+                district_syndicates[d_name].append(s_name)
+            if vec:
+                district_vectors[d_name][vec] = district_vectors[d_name].get(vec, 0) + cnt
+
+        # Compile all 64 districts
+        districts_list = []
+        total_national_volume = 0.0
+        total_collusive_volume = 0.0
+        total_packages_count = 0
+        total_flagged_count = 0
+
+        for dist_name, coords in BANGLADESH_DISTRICT_COORDINATES.items():
+            if division and division != "All" and coords["division"] != division:
+                continue
+
+            stat = district_data_map.get(dist_name, {
+                "division": coords["division"],
+                "total_packages": 0,
+                "total_volume": 0.0,
+                "collusive_packages": 0,
+                "collusive_volume": 0.0
+            })
+
+            tot_pkg = stat["total_packages"]
+            tot_vol = stat["total_volume"]
+            col_pkg = stat["collusive_packages"]
+            col_vol = stat["collusive_volume"]
+
+            total_packages_count += tot_pkg
+            total_flagged_count += col_pkg
+            total_national_volume += tot_vol
+            total_collusive_volume += col_vol
+
+            collusion_rate_pct = round((col_vol / max(tot_vol, 1.0)) * 100.0, 2) if tot_vol > 0 else 0.0
+            integrity_score = round(max(10.0, min(100.0, 100.0 - (collusion_rate_pct * 2.6))), 1) if tot_vol > 0 else 100.0
+            threat_score = round(100.0 - integrity_score, 1)
+
+            if integrity_score < 65.0 and col_pkg > 0:
+                threat_tier = "CRITICAL"
+                tier_color = "#ef4444"
+            elif integrity_score < 75.0 and col_pkg > 0:
+                threat_tier = "HIGH"
+                tier_color = "#f97316"
+            elif integrity_score < 85.0 and col_pkg > 0:
+                threat_tier = "ELEVATED"
+                tier_color = "#f59e0b"
+            elif col_pkg > 0:
+                threat_tier = "MODERATE"
+                tier_color = "#06b6d4"
+            else:
+                threat_tier = "CLEAN"
+                tier_color = "#10b981"
+
+            v_dict = district_vectors.get(dist_name, {})
+            primary_vector = max(v_dict, key=v_dict.get) if v_dict else "NONE"
+
+            districts_list.append({
+                "district": dist_name,
+                "division": coords["division"],
+                "latitude": coords["lat"],
+                "longitude": coords["lon"],
+                "total_packages": tot_pkg,
+                "total_volume_bdt": tot_vol,
+                "total_volume_cr": round(tot_vol / 10000000.0, 2),
+                "collusive_packages": col_pkg,
+                "collusive_volume_bdt": col_vol,
+                "collusive_volume_cr": round(col_vol / 10000000.0, 2),
+                "collusion_rate_pct": collusion_rate_pct,
+                "integrity_score": integrity_score,
+                "threat_score": threat_score,
+                "threat_tier": threat_tier,
+                "tier_color": tier_color,
+                "active_syndicates": district_syndicates.get(dist_name, []),
+                "primary_vector": primary_vector
+            })
+
+        # Sort districts by threat score descending
+        districts_list.sort(key=lambda d: (d["threat_score"], d["collusive_volume_cr"]), reverse=True)
+
+        # Cross-district syndicate arcs (tentacles connecting syndicate operating territories)
+        collusion_arcs = []
+        syndicate_coverage = [
+            ("Padma-Jamuna Highway Syndicate", ["Dhaka", "Faridpur", "Manikganj"], "#ef4444", 94.8),
+            ("Northern Road Sector Ring", ["Rangpur", "Dinajpur", "Bogura"], "#f97316", 89.5),
+            ("Chittagong Coastal Embankment Cartel", ["Chattogram", "Cox's Bazar"], "#ef4444", 92.4),
+            ("Sylhet Haor Flood Protection Guild", ["Sylhet", "Sunamganj", "Moulvibazar"], "#f59e0b", 88.7),
+            ("Barisal River Dredging Alliance", ["Barishal", "Patuakhali", "Bhola"], "#ef4444", 91.0),
+            ("Rajshahi Urban Infrastructure Syndicate", ["Rajshahi", "Naogaon", "Natore"], "#f59e0b", 86.5),
+            ("Khulna Coastal Salinity Circle", ["Khulna", "Satkhira", "Bagerhat"], "#ef4444", 90.3),
+            ("Dhaka South Metro Building Cartel", ["Dhaka", "Narayanganj"], "#ef4444", 93.6),
+            ("PGCB High-Voltage Grid Syndicate", ["Cumilla", "Feni", "Noakhali"], "#f59e0b", 87.8),
+            ("BREB Rural Electrification Ring", ["Mymensingh", "Jamalpur", "Netrokona"], "#f97316", 89.2),
+            ("EED Model College & School Ring", ["Tangail", "Gazipur", "Narsingdi"], "#f59e0b", 88.0),
+            ("Southwest Bridge & Culvert Syndicate", ["Jashore", "Kushtia", "Jhenaidah"], "#f97316", 88.5),
+            ("North Bengal Deep Tube Well Ring", ["Dinajpur", "Kurigram", "Gaibandha"], "#f97316", 89.0),
+            ("Meghna Bridge Approach Syndicate", ["Munshiganj", "Chandpur"], "#ef4444", 93.0),
+            ("Sundarbans Polder Restoration Ring", ["Satkhira", "Bagerhat"], "#ef4444", 90.5)
+        ]
+
+        active_dist_names = {d["district"] for d in districts_list}
+        for syn_name, member_dists, arc_color, syn_risk in syndicate_coverage:
+            for i in range(len(member_dists)):
+                for j in range(i + 1, len(member_dists)):
+                    d1, d2 = member_dists[i], member_dists[j]
+                    if d1 in BANGLADESH_DISTRICT_COORDINATES and d2 in BANGLADESH_DISTRICT_COORDINATES:
+                        if d1 in active_dist_names or d2 in active_dist_names:
+                            c1 = BANGLADESH_DISTRICT_COORDINATES[d1]
+                            c2 = BANGLADESH_DISTRICT_COORDINATES[d2]
+                            collusion_arcs.append({
+                                "syndicate": syn_name,
+                                "source_district": d1,
+                                "target_district": d2,
+                                "source_lat": c1["lat"],
+                                "source_lon": c1["lon"],
+                                "target_lat": c2["lat"],
+                                "target_lon": c2["lon"],
+                                "color": arc_color,
+                                "risk": syn_risk
+                            })
+
+        national_integrity = round(
+            sum(d["integrity_score"] for d in districts_list) / max(len(districts_list), 1), 1
+        )
+        critical_count = sum(1 for d in districts_list if d["threat_tier"] == "CRITICAL")
+        high_count = sum(1 for d in districts_list if d["threat_tier"] == "HIGH")
+        clean_count = sum(1 for d in districts_list if d["threat_tier"] == "CLEAN")
+
+        result = {
+            "success": True,
+            "total_districts": len(districts_list),
+            "national_integrity_score": national_integrity,
+            "total_packages": total_packages_count,
+            "total_volume_cr": round(total_national_volume / 10000000.0, 2),
+            "collusive_packages": total_flagged_count,
+            "collusive_volume_cr": round(total_collusive_volume / 10000000.0, 2),
+            "national_collusion_rate_pct": round((total_collusive_volume / max(total_national_volume, 1.0)) * 100.0, 2),
+            "critical_threat_districts_count": critical_count,
+            "high_threat_districts_count": high_count,
+            "clean_districts_count": clean_count,
+            "districts": districts_list,
+            "collusion_arcs": collusion_arcs,
+            "filter_applied": {
+                "agency": agency or "All",
+                "year": str(year) if year else "All",
+                "division": division or "All"
+            }
+        }
+
+        self._cached_heatmap[cache_key] = result
+        return result
+
+
+# ----------------------------------------------------------------------
+# Precision Centroids for all 64 Administrative Districts of Bangladesh
+# ----------------------------------------------------------------------
+BANGLADESH_DISTRICT_COORDINATES = {
+    # Dhaka Division (13)
+    "Dhaka": {"lat": 23.8103, "lon": 90.4125, "division": "Dhaka"},
+    "Gazipur": {"lat": 23.9999, "lon": 90.4203, "division": "Dhaka"},
+    "Narayanganj": {"lat": 23.6238, "lon": 90.5000, "division": "Dhaka"},
+    "Tangail": {"lat": 24.2513, "lon": 89.9167, "division": "Dhaka"},
+    "Faridpur": {"lat": 23.6071, "lon": 89.8429, "division": "Dhaka"},
+    "Manikganj": {"lat": 23.8617, "lon": 90.0003, "division": "Dhaka"},
+    "Munshiganj": {"lat": 23.5422, "lon": 90.5305, "division": "Dhaka"},
+    "Narsingdi": {"lat": 23.9322, "lon": 90.7154, "division": "Dhaka"},
+    "Gopalganj": {"lat": 23.0051, "lon": 89.8266, "division": "Dhaka"},
+    "Madaripur": {"lat": 23.1641, "lon": 90.1897, "division": "Dhaka"},
+    "Rajbari": {"lat": 23.7574, "lon": 89.6445, "division": "Dhaka"},
+    "Shariatpur": {"lat": 23.2423, "lon": 90.4348, "division": "Dhaka"},
+    "Kishoreganj": {"lat": 24.4449, "lon": 90.7766, "division": "Dhaka"},
+
+    # Chattogram Division (11)
+    "Chattogram": {"lat": 22.3569, "lon": 91.7832, "division": "Chattogram"},
+    "Cox's Bazar": {"lat": 21.4272, "lon": 92.0058, "division": "Chattogram"},
+    "Cumilla": {"lat": 23.4607, "lon": 91.1809, "division": "Chattogram"},
+    "Feni": {"lat": 23.0186, "lon": 91.3966, "division": "Chattogram"},
+    "Brahmanbaria": {"lat": 23.9571, "lon": 91.1119, "division": "Chattogram"},
+    "Noakhali": {"lat": 22.8696, "lon": 91.0993, "division": "Chattogram"},
+    "Chandpur": {"lat": 23.2333, "lon": 90.6667, "division": "Chattogram"},
+    "Lakshmipur": {"lat": 22.9425, "lon": 90.8412, "division": "Chattogram"},
+    "Khagrachhari": {"lat": 23.1193, "lon": 91.9847, "division": "Chattogram"},
+    "Rangamati": {"lat": 22.7324, "lon": 92.2985, "division": "Chattogram"},
+    "Bandarban": {"lat": 22.1953, "lon": 92.2184, "division": "Chattogram"},
+
+    # Rajshahi Division (8)
+    "Rajshahi": {"lat": 24.3745, "lon": 88.6042, "division": "Rajshahi"},
+    "Bogura": {"lat": 24.8465, "lon": 89.3777, "division": "Rajshahi"},
+    "Pabna": {"lat": 24.0064, "lon": 89.2372, "division": "Rajshahi"},
+    "Sirajganj": {"lat": 24.4534, "lon": 89.7008, "division": "Rajshahi"},
+    "Naogaon": {"lat": 24.7936, "lon": 88.9318, "division": "Rajshahi"},
+    "Natore": {"lat": 24.4206, "lon": 88.9324, "division": "Rajshahi"},
+    "Chapai Nawabganj": {"lat": 24.5965, "lon": 88.2775, "division": "Rajshahi"},
+    "Joypurhat": {"lat": 25.1015, "lon": 89.0277, "division": "Rajshahi"},
+
+    # Khulna Division (10)
+    "Khulna": {"lat": 22.8456, "lon": 89.5403, "division": "Khulna"},
+    "Jashore": {"lat": 23.1664, "lon": 89.2137, "division": "Khulna"},
+    "Kushtia": {"lat": 23.9013, "lon": 89.1205, "division": "Khulna"},
+    "Satkhira": {"lat": 22.7185, "lon": 89.0705, "division": "Khulna"},
+    "Bagerhat": {"lat": 22.6516, "lon": 89.7859, "division": "Khulna"},
+    "Jhenaidah": {"lat": 23.5450, "lon": 89.1726, "division": "Khulna"},
+    "Chuadanga": {"lat": 23.6402, "lon": 88.8418, "division": "Khulna"},
+    "Magura": {"lat": 23.4873, "lon": 89.4198, "division": "Khulna"},
+    "Meherpur": {"lat": 23.7749, "lon": 88.6318, "division": "Khulna"},
+    "Narail": {"lat": 23.1725, "lon": 89.5127, "division": "Khulna"},
+
+    # Barishal Division (6)
+    "Barishal": {"lat": 22.7010, "lon": 90.3535, "division": "Barishal"},
+    "Patuakhali": {"lat": 22.3596, "lon": 90.3299, "division": "Barishal"},
+    "Bhola": {"lat": 22.6859, "lon": 90.6481, "division": "Barishal"},
+    "Pirojpur": {"lat": 22.5841, "lon": 89.9720, "division": "Barishal"},
+    "Barguna": {"lat": 22.1570, "lon": 90.1256, "division": "Barishal"},
+    "Jhalokati": {"lat": 22.6406, "lon": 90.1987, "division": "Barishal"},
+
+    # Sylhet Division (4)
+    "Sylhet": {"lat": 24.8949, "lon": 91.8687, "division": "Sylhet"},
+    "Sunamganj": {"lat": 25.0658, "lon": 91.3950, "division": "Sylhet"},
+    "Moulvibazar": {"lat": 24.4829, "lon": 91.7774, "division": "Sylhet"},
+    "Habiganj": {"lat": 24.3750, "lon": 91.4167, "division": "Sylhet"},
+
+    # Rangpur Division (8)
+    "Rangpur": {"lat": 25.7439, "lon": 89.2752, "division": "Rangpur"},
+    "Dinajpur": {"lat": 25.6217, "lon": 88.6355, "division": "Rangpur"},
+    "Kurigram": {"lat": 25.8054, "lon": 89.6362, "division": "Rangpur"},
+    "Gaibandha": {"lat": 25.3288, "lon": 89.5281, "division": "Rangpur"},
+    "Nilphamari": {"lat": 25.9318, "lon": 88.8560, "division": "Rangpur"},
+    "Lalmonirhat": {"lat": 25.9923, "lon": 89.2847, "division": "Rangpur"},
+    "Thakurgaon": {"lat": 26.0337, "lon": 88.4617, "division": "Rangpur"},
+    "Panchagarh": {"lat": 26.3411, "lon": 88.5542, "division": "Rangpur"},
+
+    # Mymensingh Division (4)
+    "Mymensingh": {"lat": 24.7471, "lon": 90.4203, "division": "Mymensingh"},
+    "Jamalpur": {"lat": 24.9375, "lon": 89.9378, "division": "Mymensingh"},
+    "Netrokona": {"lat": 24.8709, "lon": 90.7279, "division": "Mymensingh"},
+    "Sherpur": {"lat": 25.0205, "lon": 90.0153, "division": "Mymensingh"}
+}

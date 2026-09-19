@@ -488,6 +488,19 @@ const TenderApiService = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     }, `CPTU_SMT_Verification_Matrix_${certId}.xlsx`);
+  },
+
+  /**
+   * Fetch 64-District GIS Cartel Heatmap and territorial threat breakdown
+   */
+  async getDistrictHeatmap(filters = {}) {
+    const params = new URLSearchParams();
+    if (filters.agency && filters.agency !== 'All') params.append('agency', filters.agency);
+    if (filters.year && String(filters.year) !== 'All') params.append('year', String(filters.year));
+    if (filters.division && filters.division !== 'All') params.append('division', filters.division);
+
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    return await this._request(`/api/cartel/district-heatmap${queryStr}`);
   }
 };
 

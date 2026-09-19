@@ -2238,6 +2238,17 @@
         </div>
       </div>
 
+      <!-- Cartel Intelligence Dual Viewport Toggle (3D Network Topology vs 64-District GIS Heat Map) -->
+      <div style="display: flex; gap: 0.5rem; margin-bottom: 1.25rem; align-items: center; border-bottom: 1px solid var(--border-subtle); padding-bottom: 0.75rem; flex-wrap: wrap;">
+        <span style="font-size: 0.78rem; font-weight: 800; color: var(--text-muted); letter-spacing: 0.5px;">FORENSIC VIEWPORT:</span>
+        <button id="btnViewGatTopology" class="btn-primary" onclick="window.switchCartelViewport('topology')" style="padding: 0.35rem 0.9rem; font-size: 0.78rem;">
+          🕸️ 3D Syndicate Graph Topology
+        </button>
+        <button id="btnViewGisHeatmap" class="btn-secondary" onclick="window.switchCartelViewport('gis')" style="padding: 0.35rem 0.9rem; font-size: 0.78rem; border-color: rgba(56, 189, 248, 0.4); color: #38bdf8;">
+          🗺️ 64-District GIS Cartel Heat Map
+        </button>
+      </div>
+
       <!-- Frontier 2: Graph Attention Network (GAT) Cartel & Syndicate Radar (arXiv:2302.04612) -->
       <div id="gatCartelRadarContainer" style="margin-bottom: 1.8rem;">
         <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
@@ -2365,6 +2376,125 @@
                 <span class="pulse-dot" style="background: #10b981;"></span>
                 <span>PPR-2008 10% Rate Cap SAT</span>
               </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Frontier 2B: 64-District Bangladesh GIS Cartel Heat Map & Geospatial Viewport -->
+      <div id="gisDistrictMapContainer" style="display: none; margin-bottom: 1.8rem;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 1.5rem; box-shadow: var(--shadow-sm);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
+            <div>
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <h3 style="font-size: 1.15rem; color: var(--text-main); font-weight: 800; margin: 0; display: flex; align-items: center; gap: 8px;">
+                  <span style="font-size: 1.3rem;">🗺️</span>
+                  64-District Bangladesh GIS Cartel Heat Map &amp; Geospatial Viewport
+                </h3>
+                <span class="ai-badge badge-danger" style="font-size: 0.72rem;">50,200 AWARDS &bull; 64 DISTRICTS</span>
+              </div>
+              <p style="font-size: 0.8rem; color: var(--text-muted); margin: 0.25rem 0 0 0;">
+                Geospatial choropleth projection across all 64 districts in 8 administrative divisions of Bangladesh, tracking territorial syndicate rings, market integrity scores, and cross-district collusion tentacles.
+              </p>
+            </div>
+
+            <!-- GIS Controls & Filters -->
+            <div style="display: flex; gap: 0.5rem; flex-wrap: wrap; align-items: center;">
+              <select id="gisDivisionSelect" class="select-field" style="font-size: 0.78rem; padding: 0.4rem 0.75rem;" onchange="window.bangladeshGisHeatmap.setFilter('division', this.value)">
+                <option value="All" selected>All Divisions (8)</option>
+                <option value="Dhaka">Dhaka Division (13)</option>
+                <option value="Chattogram">Chattogram Division (11)</option>
+                <option value="Rajshahi">Rajshahi Division (8)</option>
+                <option value="Khulna">Khulna Division (10)</option>
+                <option value="Barishal">Barishal Division (6)</option>
+                <option value="Sylhet">Sylhet Division (4)</option>
+                <option value="Rangpur">Rangpur Division (8)</option>
+                <option value="Mymensingh">Mymensingh Division (4)</option>
+              </select>
+
+              <select id="gisAgencySelect" class="select-field" style="font-size: 0.78rem; padding: 0.4rem 0.75rem;" onchange="window.bangladeshGisHeatmap.setFilter('agency', this.value)">
+                <option value="All" selected>All Agencies (8)</option>
+                <option value="Roads and Highways Department (RHD)">RHD</option>
+                <option value="Local Government Engineering Department (LGED)">LGED</option>
+                <option value="Bangladesh Water Development Board (BWDB)">BWDB</option>
+                <option value="Public Works Department (PWD)">PWD</option>
+                <option value="Department of Public Health Engineering (DPHE)">DPHE</option>
+                <option value="Power Grid Company of Bangladesh (PGCB)">PGCB</option>
+                <option value="Bangladesh Rural Electrification Board (BREB)">BREB</option>
+                <option value="Education Engineering Department (EED)">EED</option>
+              </select>
+
+              <button class="btn-secondary" onclick="window.bangladeshGisHeatmap.focusDistrict('Dhaka')" style="padding: 0.4rem 0.75rem; font-size: 0.78rem;" title="Center on Capital">
+                🎯 Capital (Dhaka)
+              </button>
+              <button class="btn-secondary" onclick="window.bangladeshGisHeatmap.resetView()" style="padding: 0.4rem 0.75rem; font-size: 0.78rem;" title="Reset Zoom">
+                ↺ Reset View
+              </button>
+            </div>
+          </div>
+
+          <!-- Canvas Viewport with Overlay HUD -->
+          <div class="harvester-3d-visual-card" style="border-radius: 12px; overflow: hidden; margin-bottom: 1.25rem; border: 1px solid rgba(56, 189, 248, 0.25); position: relative; background: #020617; box-shadow: 0 15px 35px -5px rgba(0, 0, 0, 0.6);">
+            <canvas id="gisDistrictCanvas" style="width: 100%; height: 540px; display: block;"></canvas>
+            
+            <!-- Map Overlay Legend -->
+            <div style="position: absolute; top: 12px; left: 12px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); border: 1px solid rgba(51, 65, 85, 0.7); border-radius: 8px; padding: 8px 12px; font-size: 0.72rem; color: #94a3b8; pointer-events: auto;">
+              <div style="font-weight: 700; color: #f8fafc; margin-bottom: 4px;">TERRITORIAL THREAT TIERS</div>
+              <div style="display: flex; flex-direction: column; gap: 3px;">
+                <div><span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #ef4444; margin-right: 5px;"></span> <strong style="color: #ef4444;">CRITICAL</strong> (&lt;65 Integrity &bull; Confirmed Ring)</div>
+                <div><span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #f97316; margin-right: 5px;"></span> <strong style="color: #f97316;">HIGH</strong> (65-74 Integrity &bull; Co-Location)</div>
+                <div><span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #f59e0b; margin-right: 5px;"></span> <strong style="color: #f59e0b;">ELEVATED</strong> (75-84 Integrity &bull; Cover Spreads)</div>
+                <div><span style="display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: #10b981; margin-right: 5px;"></span> <strong style="color: #10b981;">CLEAN</strong> (85-100 Integrity &bull; Open Bidding)</div>
+              </div>
+            </div>
+
+            <!-- Quick Zoom Buttons -->
+            <div style="position: absolute; bottom: 50px; right: 14px; display: flex; flex-direction: column; gap: 4px; pointer-events: auto;">
+              <button class="btn-secondary" onclick="window.bangladeshGisHeatmap.zoomAtPoint(1.3, window.bangladeshGisHeatmap.width/2, window.bangladeshGisHeatmap.height/2)" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold; background: rgba(15, 23, 42, 0.9);">
+                +
+              </button>
+              <button class="btn-secondary" onclick="window.bangladeshGisHeatmap.zoomAtPoint(0.75, window.bangladeshGisHeatmap.width/2, window.bangladeshGisHeatmap.height/2)" style="width: 32px; height: 32px; padding: 0; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; font-weight: bold; background: rgba(15, 23, 42, 0.9);">
+                -
+              </button>
+            </div>
+
+            <div class="harvester-3d-hud-bar" id="gisDistrictHud">
+              <!-- Telemetry items populated dynamically by js/district-heatmap.js -->
+            </div>
+          </div>
+
+          <!-- District Inspector Dossier Drawer -->
+          <div id="gisDistrictInspector" style="display: none;"></div>
+
+          <!-- Territorial Threat Leaderboard (Top 10 High-Risk Districts) -->
+          <div style="margin-top: 1.5rem; background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: 10px; padding: 1.25rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.85rem; flex-wrap: wrap; gap: 0.5rem;">
+              <h4 style="margin: 0; font-size: 0.95rem; color: var(--text-main); font-weight: 700; display: flex; align-items: center; gap: 6px;">
+                <span>📊</span>
+                Top High-Risk Cartel Districts (64-District Ranking)
+              </h4>
+              <span style="font-size: 0.74rem; color: var(--text-muted);">
+                Ranked by Forensic Anomaly Rate &amp; Collusive Volume Captured
+              </span>
+            </div>
+
+            <div style="overflow-x: auto;">
+              <table class="data-table" style="width: 100%; font-size: 0.78rem; text-align: left; border-collapse: collapse;">
+                <thead>
+                  <tr style="border-bottom: 2px solid var(--border-subtle); color: var(--text-muted); font-size: 0.72rem; text-transform: uppercase;">
+                    <th style="padding: 0.5rem 0.8rem;">Rank</th>
+                    <th style="padding: 0.5rem 0.8rem;">District &amp; Division</th>
+                    <th style="padding: 0.5rem 0.8rem;">Threat Tier</th>
+                    <th style="padding: 0.5rem 0.8rem;">Integrity Score</th>
+                    <th style="padding: 0.5rem 0.8rem;">Total / Flagged Volume</th>
+                    <th style="padding: 0.5rem 0.8rem;">Active Syndicate Rings</th>
+                    <th style="padding: 0.5rem 0.8rem; text-align: right;">Action</th>
+                  </tr>
+                </thead>
+                <tbody id="gisLeaderboardBody">
+                  <!-- Populated dynamically -->
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -4632,6 +4762,7 @@
   <script src="js/neuro-symbolic-smt.js"></script>
   <script src="js/cartel-3d.js"></script>
   <script src="js/gat-cartel-radar.js"></script>
+  <script src="js/district-heatmap.js"></script>
   <script src="js/sar-3d.js"></script>
   <script src="js/satellite-audit.js"></script>
   <script src="js/bayesian-3d.js"></script>

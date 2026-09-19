@@ -625,6 +625,33 @@ def get_cartel_historical_summary(
         raise HTTPException(status_code=500, detail=f"Cartel summary exception: {str(e)}")
 
 
+@app.get("/api/cartel/district-heatmap")
+def get_cartel_district_heatmap(
+    agency: Optional[str] = None,
+    year: Optional[str] = None,
+    division: Optional[str] = None,
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_AUDITOR, ROLE_ADMIN]))
+):
+    """
+    Returns 64-district Bangladesh GIS Cartel Heat Map telemetry with coordinates,
+    integrity scores, volume statistics, active syndicates, and inter-district collusion arcs.
+    """
+    try:
+        from backend.database import SessionLocal
+        db = SessionLocal()
+        try:
+            return cartel_engine.get_district_geospatial_heatmap(
+                db=db,
+                agency=agency,
+                year=year,
+                division=division
+            )
+        finally:
+            db.close()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"District Heatmap exception: {str(e)}")
+
+
 @app.get("/api/cartel/export/excel")
 def export_cartel_excel(
     current_user: Dict[str, Any] = Depends(require_roles([ROLE_AUDITOR, ROLE_ADMIN, ROLE_EXECUTIVE]))
