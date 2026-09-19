@@ -14,7 +14,7 @@ services:
       - SH_INSTANCE_ID=${SH_INSTANCE_ID:-01a74708-c309-40e7-aacd-e69298313ecc}
       - REDIS_URL=redis://redis:6379/0
     volumes:
-      - ./data:/app/data
+      - tenderpulse_data:/app/data
     networks:
       - tenderpulse_net
     healthcheck:
@@ -25,13 +25,14 @@ services:
       start_period: 10s
 
   nginx:
-    image: nginx:alpine
+    build:
+      context: ./nginx
+      dockerfile: Dockerfile
+    image: tenderpulse-nginx:latest
     container_name: tenderpulse_nginx
     restart: unless-stopped
     ports:
       - "${HOST_PORT:-8080}:80"
-    volumes:
-      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
       app:
         condition: service_healthy
@@ -53,4 +54,6 @@ networks:
 
 volumes:
   redis_data:
+    driver: local
+  tenderpulse_data:
     driver: local
