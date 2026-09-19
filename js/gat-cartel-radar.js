@@ -115,7 +115,17 @@ class GatCartelRadarEngine {
 
             <button class="btn-secondary" id="btnExportCartelDossier" style="padding: 0.4rem 0.85rem; font-size: 0.78rem;">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              <span>Export Dossier (.JSON)</span>
+              <span>Export (.JSON)</span>
+            </button>
+
+            <button class="btn-secondary" id="btnExportCartelExcel" style="padding: 0.4rem 0.85rem; font-size: 0.78rem; border-color: rgba(16, 185, 129, 0.4); color: #10b981;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              <span>📊 Export Excel (.XLSX)</span>
+            </button>
+
+            <button class="btn-secondary" id="btnExportCartelPdf" style="padding: 0.4rem 0.85rem; font-size: 0.78rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              <span>📄 Export PDF Audit</span>
             </button>
 
             <button class="btn-primary" id="btnScanCartelGraph" style="padding: 0.4rem 1rem; font-size: 0.78rem; background: linear-gradient(135deg, #dc2626, #b91c1c);">
@@ -313,6 +323,20 @@ class GatCartelRadarEngine {
         URL.revokeObjectURL(url);
       });
     }
+
+    const btnExportExcel = document.getElementById("btnExportCartelExcel");
+    if (btnExportExcel) {
+      btnExportExcel.addEventListener("click", () => {
+        window.exportCartelExcelReport();
+      });
+    }
+
+    const btnExportPdf = document.getElementById("btnExportCartelPdf");
+    if (btnExportPdf) {
+      btnExportPdf.addEventListener("click", () => {
+        window.exportCartelPdfReport();
+      });
+    }
   }
 
   syncStore() {
@@ -323,6 +347,31 @@ class GatCartelRadarEngine {
     }
   }
 }
+
+// Global Export Functions for Cartel Forensics
+window.exportCartelExcelReport = async function() {
+  try {
+    if (typeof showToast === 'function') showToast('📊 Generating CPTU Cartel Excel Audit...', 'info');
+    const filename = await window.TenderApiService.exportCartelExcel();
+    if (typeof showToast === 'function') showToast(`📥 Downloaded ${filename}`, 'success');
+  } catch (err) {
+    console.error('[GatCartelRadar] Cartel Excel export failed:', err);
+    if (typeof showToast === 'function') showToast(`Export error: ${err.message}`, 'error');
+    else alert(`Export failed: ${err.message}`);
+  }
+};
+
+window.exportCartelPdfReport = async function() {
+  try {
+    if (typeof showToast === 'function') showToast('📄 Compiling Official Institutional CPTU Cartel PDF Dossier...', 'info');
+    const filename = await window.TenderApiService.exportCartelPdf();
+    if (typeof showToast === 'function') showToast(`📥 Downloaded ${filename}`, 'success');
+  } catch (err) {
+    console.error('[GatCartelRadar] Cartel PDF export failed:', err);
+    if (typeof showToast === 'function') showToast(`Export error: ${err.message}`, 'error');
+    else alert(`Export failed: ${err.message}`);
+  }
+};
 
 // Global Singleton Instance
 window.gatCartelRadar = new GatCartelRadarEngine();

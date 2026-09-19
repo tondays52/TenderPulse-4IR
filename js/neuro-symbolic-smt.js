@@ -227,11 +227,19 @@ class NeuroSymbolicSmtEngine {
             </span>
             <span style="color: #38bdf8; font-size: 0.76rem; font-weight: 600;">CERT: ${certId}</span>
           </div>
-          <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
             <span style="color: #64748b; font-size: 0.74rem;">Engine: ${engine}</span>
-            <button class="btn-secondary" onclick="window.exportSmtCertificate()" style="padding: 0.25rem 0.65rem; font-size: 0.7rem; border-color: rgba(56, 189, 248, 0.3); color: #38bdf8;">
+            <button class="btn-secondary" onclick="window.exportSmtCertificate()" style="padding: 0.25rem 0.6rem; font-size: 0.7rem; border-color: rgba(56, 189, 248, 0.3); color: #38bdf8;">
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 3px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-              Export Proof
+              JSON
+            </button>
+            <button class="btn-secondary" onclick="window.exportSmtPdfCertificate()" style="padding: 0.25rem 0.6rem; font-size: 0.7rem; border-color: rgba(239, 68, 68, 0.4); color: #f87171;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 3px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              PDF Certificate
+            </button>
+            <button class="btn-secondary" onclick="window.exportSmtExcelMatrix()" style="padding: 0.25rem 0.6rem; font-size: 0.7rem; border-color: rgba(16, 185, 129, 0.4); color: #10b981;">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 3px;"><polygon points="12 2 2 7 12 12 22 7 12 2"></polygon><polyline points="2 17 12 22 22 17"></polyline><polyline points="2 12 12 17 22 12"></polyline></svg>
+              Excel Matrix
             </button>
           </div>
         </div>
@@ -309,5 +317,59 @@ window.exportSmtCertificate = function() {
   URL.revokeObjectURL(url);
   if (typeof showToast === "function") {
     showToast(`📥 Exported Proof Certificate (${proof.certificate_id || 'CERT'})`, "success");
+  }
+};
+
+window.exportSmtPdfCertificate = async function() {
+  const proof = window.neuroSymbolicSmt?.lastProofResult || (window.neuroSymbolicSmt && window.neuroSymbolicSmt.solveLocal());
+  if (!proof) {
+    if (typeof showToast === "function") showToast("No active SMT proof to export. Please run solver first.", "warning");
+    else if (typeof alert === "function") alert("No active SMT proof to export. Please run solver first.");
+    return;
+  }
+  try {
+    if (typeof showToast === "function") showToast("📜 Compiling Official Z3 SMT Proof Certificate PDF...", "info");
+    const payload = {
+      smt_data: proof,
+      tender_id: window.neuroSymbolicSmt?.currentTenderId || '986772',
+      contract_value: 45000000.0,
+      variation_pct: 12.5,
+      bank_guarantee_valid: true,
+      turnover_ratio: 1.45,
+      similar_experience: true
+    };
+    const filename = await window.TenderApiService.exportSmtPdf(payload);
+    if (typeof showToast === "function") showToast(`📥 Downloaded ${filename}`, "success");
+  } catch (err) {
+    console.error("[NeuroSymbolicSMT] PDF export error:", err);
+    if (typeof showToast === "function") showToast(`SMT PDF export failed: ${err.message}`, "error");
+    else alert(`Export failed: ${err.message}`);
+  }
+};
+
+window.exportSmtExcelMatrix = async function() {
+  const proof = window.neuroSymbolicSmt?.lastProofResult || (window.neuroSymbolicSmt && window.neuroSymbolicSmt.solveLocal());
+  if (!proof) {
+    if (typeof showToast === "function") showToast("No active SMT proof to export. Please run solver first.", "warning");
+    else if (typeof alert === "function") alert("No active SMT proof to export. Please run solver first.");
+    return;
+  }
+  try {
+    if (typeof showToast === "function") showToast("📊 Generating CPTU SMT Verification Matrix (.XLSX)...", "info");
+    const payload = {
+      smt_data: proof,
+      tender_id: window.neuroSymbolicSmt?.currentTenderId || '986772',
+      contract_value: 45000000.0,
+      variation_pct: 12.5,
+      bank_guarantee_valid: true,
+      turnover_ratio: 1.45,
+      similar_experience: true
+    };
+    const filename = await window.TenderApiService.exportSmtExcel(payload);
+    if (typeof showToast === "function") showToast(`📥 Downloaded ${filename}`, "success");
+  } catch (err) {
+    console.error("[NeuroSymbolicSMT] Excel export error:", err);
+    if (typeof showToast === "function") showToast(`SMT Excel export failed: ${err.message}`, "error");
+    else alert(`Export failed: ${err.message}`);
   }
 };

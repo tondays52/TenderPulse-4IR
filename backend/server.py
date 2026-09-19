@@ -13,7 +13,7 @@ from typing import Dict, Any, List, Optional
 from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Depends, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -39,6 +39,12 @@ from backend.copilot_engine import tender_copilot_engine, CopilotQueryRequest
 from backend.decision_engine import bid_decision_engine, DecisionEvaluationRequest
 from backend.sentinel_hub import sentinel_pipeline
 from backend.harvester_daemon import get_daemon_instance, HarvesterDaemon
+from backend.report_exporter import (
+    generate_cartel_excel_report,
+    generate_cartel_pdf_report,
+    generate_smt_pdf_certificate,
+    generate_smt_excel_matrix
+)
 from backend.database import init_db, SessionLocal, get_db
 import backend.crud as crud
 from backend.models import TenderModel, UserModel, BiddingSyndicateModel, CorrigendumModel
@@ -512,6 +518,52 @@ def verify_cptu_rules(
         raise HTTPException(status_code=500, detail=f"SMT Solver exception: {str(e)}")
 
 
+@app.post("/api/smt/export/pdf")
+def export_smt_pdf_certificate(
+    req: LegalVerifyRequest,
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_AUDITOR, ROLE_ADMIN]))
+):
+    """
+    Generates an official downloadable CPTU Statutory SMT Proof Certificate in PDF format.
+    """
+    try:
+        result = prover.verify_contract_compliance(req.dict())
+        pdf_bytes = generate_smt_pdf_certificate(result, req.dict())
+        cert_id = result.get("certificate_id", "SMT-PROOF")
+        return StreamingResponse(
+            pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{cert_id}.pdf"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SMT PDF Export error: {str(e)}")
+
+
+@app.post("/api/smt/export/excel")
+def export_smt_excel_matrix(
+    req: LegalVerifyRequest,
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_AUDITOR, ROLE_ADMIN]))
+):
+    """
+    Generates a structured downloadable SMT Proof Matrix and Rule Evaluation Spreadsheet in XLSX format.
+    """
+    try:
+        result = prover.verify_contract_compliance(req.dict())
+        excel_bytes = generate_smt_excel_matrix(result, req.dict())
+        cert_id = result.get("certificate_id", "SMT-PROOF")
+        return StreamingResponse(
+            excel_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{cert_id}_matrix.xlsx"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"SMT Excel Export error: {str(e)}")
+
+
 @app.post("/api/cartel/analyze")
 def analyze_cartel_network(
     payload: Optional[Dict[str, Any]] = None,
@@ -571,6 +623,50 @@ def get_cartel_historical_summary(
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cartel summary exception: {str(e)}")
+
+
+@app.get("/api/cartel/export/excel")
+def export_cartel_excel(
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_AUDITOR, ROLE_ADMIN, ROLE_EXECUTIVE]))
+):
+    """
+    Generates an official multi-tab Cartel Forensic Audit Dossier in Excel (.xlsx) format.
+    """
+    try:
+        report = cartel_engine.analyze_large_scale_historical(limit=50000)
+        excel_bytes = generate_cartel_excel_report(report)
+        filename = f"cartel_forensic_audit_{time.strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return StreamingResponse(
+            excel_bytes,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cartel Excel Export error: {str(e)}")
+
+
+@app.get("/api/cartel/export/pdf")
+def export_cartel_pdf(
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_AUDITOR, ROLE_ADMIN, ROLE_EXECUTIVE]))
+):
+    """
+    Generates an official institutional Cartel Forensic Audit Dossier in PDF format.
+    """
+    try:
+        report = cartel_engine.analyze_large_scale_historical(limit=50000)
+        pdf_bytes = generate_cartel_pdf_report(report)
+        filename = f"cartel_audit_dossier_{time.strftime('%Y%m%d_%H%M%S')}.pdf"
+        return StreamingResponse(
+            pdf_bytes,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            }
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cartel PDF Export error: {str(e)}")
 
 
 @app.post("/api/sar/audit")

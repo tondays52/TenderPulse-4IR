@@ -417,6 +417,77 @@ const TenderApiService = {
       return res.data.users;
     }
     return [];
+  },
+
+  /**
+   * Universal authenticated blob downloader for PDF, Excel, and other document exports
+   */
+  async _downloadBlob(endpoint, options = {}, defaultFilename = 'download') {
+    const url = `${this.baseUrl}${endpoint}`;
+    const token = (typeof localStorage !== 'undefined') ? localStorage.getItem('tenderpulse_access_token') : null;
+    const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
+
+    const fetchOptions = {
+      ...options,
+      headers: {
+        ...authHeader,
+        ...(options.headers || {})
+      }
+    };
+
+    const response = await fetch(url, fetchOptions);
+    if (!response.ok) {
+      let errMsg = `HTTP ${response.status}: ${response.statusText}`;
+      try {
+        const errJson = await response.json();
+        if (errJson.detail) errMsg = errJson.detail;
+      } catch (e) {}
+      throw new Error(errMsg);
+    }
+
+    const disposition = response.headers.get('content-disposition');
+    let filename = defaultFilename;
+    if (disposition && disposition.includes('filename=')) {
+      const matches = disposition.match(/filename="?([^"]+)"?/);
+      if (matches && matches[1]) filename = matches[1];
+    }
+
+    const blob = await response.blob();
+    const blobUrl = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    window.URL.revokeObjectURL(blobUrl);
+    return filename;
+  },
+
+  async exportCartelExcel() {
+    return await this._downloadBlob('/api/cartel/export/excel', { method: 'GET' }, 'CPTU_Cartel_Audit_Dossier.xlsx');
+  },
+
+  async exportCartelPdf() {
+    return await this._downloadBlob('/api/cartel/export/pdf', { method: 'GET' }, 'CPTU_Cartel_Audit_Dossier.pdf');
+  },
+
+  async exportSmtPdf(payload) {
+    const certId = payload?.smt_data?.certificate_id || 'CERT';
+    return await this._downloadBlob('/api/smt/export/pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }, `CPTU_SMT_Proof_${certId}.pdf`);
+  },
+
+  async exportSmtExcel(payload) {
+    const certId = payload?.smt_data?.certificate_id || 'CERT';
+    return await this._downloadBlob('/api/smt/export/excel', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    }, `CPTU_SMT_Verification_Matrix_${certId}.xlsx`);
   }
 };
 
