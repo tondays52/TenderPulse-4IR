@@ -6,6 +6,7 @@ Formally verifies Bangladesh CPTU PPR 2008 & 2026 Procurement Rules using Micros
 
 import hashlib
 import json
+import threading
 from typing import Dict, Any, List
 
 try:
@@ -13,6 +14,9 @@ try:
     HAS_Z3 = True
 except ImportError:
     HAS_Z3 = False
+
+# Global lock to prevent multi-threaded race conditions in Z3 C++ AST context
+_Z3_LOCK = threading.Lock()
 
 
 class CptuLegalProver:
@@ -58,58 +62,74 @@ class CptuLegalProver:
         z3_model_dict = {}
 
         if HAS_Z3:
-            solver = z3.Solver()
+            try:
+                with _Z3_LOCK:
+                    solver = z3.Solver()
 
-            # Define Z3 real variables
-            OrigVal = z3.Real('OrigVal')
-            VoVal = z3.Real('VoVal')
-            VoPct = z3.Real('VoPct')
-            PerfSec = z3.Real('PerfSec')
-            CapA = z3.Real('CapA')
-            CapN = z3.Real('CapN')
-            CapB = z3.Real('CapB')
-            TenderVal = z3.Real('TenderVal')
-            AssessedCap = z3.Real('AssessedCap')
-            CabinetApproved = z3.Bool('CabinetApproved')
+                    # Define Z3 real variables
+                    OrigVal = z3.Real('OrigVal')
+                    VoVal = z3.Real('VoVal')
+                    VoPct = z3.Real('VoPct')
+                    PerfSec = z3.Real('PerfSec')
+                    CapA = z3.Real('CapA')
+                    CapN = z3.Real('CapN')
+                    CapB = z3.Real('CapB')
+                    TenderVal = z3.Real('TenderVal')
+                    AssessedCap = z3.Real('AssessedCap')
+                    CabinetApproved = z3.Bool('CabinetApproved')
 
-            # Axioms & Concrete Values
-            solver.add(OrigVal == orig_val)
-            solver.add(VoVal == vo_val)
-            solver.add(VoPct == (VoVal / OrigVal) * 100)
-            solver.add(PerfSec == perf_sec_pct)
-            solver.add(CapA == turnover_a)
-            solver.add(CapN == period_n)
-            solver.add(CapB == commitments_b)
-            solver.add(TenderVal == tender_val)
-            solver.add(AssessedCap == (CapA * CapN * 1.5) - CapB)
-            solver.add(CabinetApproved == has_cabinet_clearance)
+                    # Axioms & Concrete Values
+                    solver.add(OrigVal == orig_val)
+                    solver.add(VoVal == vo_val)
+                    solver.add(VoPct == (VoVal / OrigVal) * 100)
+                    solver.add(PerfSec == perf_sec_pct)
+                    solver.add(CapA == turnover_a)
+                    solver.add(CapN == period_n)
+                    solver.add(CapB == commitments_b)
+                    solver.add(TenderVal == tender_val)
+                    solver.add(AssessedCap == (CapA * CapN * 1.5) - CapB)
+                    solver.add(CabinetApproved == has_cabinet_clearance)
 
-            # CPTU Rule 39/40 Statutory Axiom:
-            # (VoPct <= 15.0) OR CabinetApproved
-            cptu_rule_39 = z3.Or(VoPct <= 15.0, CabinetApproved == True)
+                    # CPTU Rule 39/40 Statutory Axiom:
+                    # (VoPct <= 15.0) OR CabinetApproved
+                    cptu_rule_39 = z3.Or(VoPct <= 15.0, CabinetApproved == True)
 
-            # Form e-PW3-8 Performance Security Axiom: PerfSec >= 10.0%
-            cptu_rule_perf = PerfSec >= 10.0
+                    # Form e-PW3-8 Performance Security Axiom: PerfSec >= 10.0%
+                    cptu_rule_perf = PerfSec >= 10.0
 
-            # Rule 98 Financial Capacity Axiom: AssessedCap >= TenderVal
-            cptu_rule_cap = AssessedCap >= TenderVal
+                    # Rule 98 Financial Capacity Axiom: AssessedCap >= TenderVal
+                    cptu_rule_cap = AssessedCap >= TenderVal
 
-            # Add conjunction of rules
-            solver.add(cptu_rule_39)
-            solver.add(cptu_rule_perf)
-            solver.add(cptu_rule_cap)
+                    # Add conjunction of rules
+                    solver.add(cptu_rule_39)
+                    solver.add(cptu_rule_perf)
+                    solver.add(cptu_rule_cap)
 
-            check_result = solver.check()
-            if check_result == z3.sat:
-                is_sat = True
-                m = solver.model()
+                    check_result = solver.check()
+                    if check_result == z3.sat:
+                        is_sat = True
+                        m = solver.model()
+                        z3_model_dict = {
+                            "VoPct": float(m.eval(VoPct).as_decimal(4).rstrip('?')),
+                            "AssessedCapacity": float(m.eval(AssessedCap).as_decimal(4).rstrip('?')),
+                            "CapacitySurplus": float(m.eval(AssessedCap - TenderVal).as_decimal(4).rstrip('?'))
+                        }
+                    else:
+                        is_sat = False
+            except Exception:
+                # Fallback in case of solver execution error
+                if vo_percentage > 15.0 and not has_cabinet_clearance:
+                    is_sat = False
+                if perf_sec_pct < 10.0:
+                    is_sat = False
+                if assessed_capacity < tender_val:
+                    is_sat = False
+
                 z3_model_dict = {
-                    "VoPct": float(m.eval(VoPct).as_decimal(4).rstrip('?')),
-                    "AssessedCapacity": float(m.eval(AssessedCap).as_decimal(4).rstrip('?')),
-                    "CapacitySurplus": float(m.eval(AssessedCap - TenderVal).as_decimal(4).rstrip('?'))
+                    "VoPct": round(vo_percentage, 2),
+                    "AssessedCapacity": round(assessed_capacity, 2),
+                    "CapacitySurplus": round(assessed_capacity - tender_val, 2)
                 }
-            else:
-                is_sat = False
         else:
             # Deterministic Fallback Logic Solver
             if vo_percentage > 15.0 and not has_cabinet_clearance:

@@ -1,0 +1,90 @@
+{
+  "timestamp": "2026-09-19T19:25:53Z",
+  "target": "http://127.0.0.1:8080",
+  "concurrency_profile": "200 Virtual Clients (50 Worker Pool)",
+  "total_requests_executed": 1020,
+  "total_errors": 0,
+  "overall_sla_passed": true,
+  "scenarios": [
+    {
+      "scenario": "64-District GIS Heatmap & 50K Database Load",
+      "total_requests": 250,
+      "duration_sec": 8.35,
+      "throughput_rps": 29.95,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "latency_ms": {
+        "min": 123.35,
+        "mean": 1236.5,
+        "p50_median": 294.05,
+        "p90": 3366.28,
+        "p95": 3751.0,
+        "p99": 4451.29,
+        "max": 5224.78
+      },
+      "status_codes": {
+        "200": 250
+      }
+    },
+    {
+      "scenario": "Microsoft Z3 SMT Prover High-Frequency Resolution",
+      "total_requests": 250,
+      "duration_sec": 4.03,
+      "throughput_rps": 62.1,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "latency_ms": {
+        "min": 103.13,
+        "mean": 730.08,
+        "p50_median": 639.9,
+        "p90": 1030.56,
+        "p95": 1042.11,
+        "p99": 1050.73,
+        "max": 1063.89
+      },
+      "status_codes": {
+        "200": 250
+      }
+    },
+    {
+      "scenario": "Automated PDF & Excel Document Streaming Engine",
+      "total_requests": 120,
+      "duration_sec": 36.06,
+      "throughput_rps": 3.33,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "latency_ms": {
+        "min": 268.15,
+        "mean": 11715.34,
+        "p50_median": 7565.44,
+        "p90": 27526.94,
+        "p95": 27694.61,
+        "p99": 27733.13,
+        "max": 27746.58
+      },
+      "status_codes": {
+        "200": 120
+      }
+    },
+    {
+      "scenario": "Mixed Enterprise Production Workload (200 Concurrent Users)",
+      "total_requests": 400,
+      "duration_sec": 16.78,
+      "throughput_rps": 23.84,
+      "error_count": 0,
+      "error_rate_pct": 0.0,
+      "latency_ms": {
+        "min": 33.07,
+        "mean": 1998.57,
+        "p50_median": 591.22,
+        "p90": 7196.53,
+        "p95": 9503.59,
+        "p99": 12823.92,
+        "max": 12971.62
+      },
+      "status_codes": {
+        "200": 400
+      }
+    }
+  ]
+}
