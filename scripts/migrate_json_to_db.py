@@ -31,7 +31,9 @@ def migrate_all():
         # 2. Migrate Live Feed Tenders
         live_feed_file = os.path.join(ROOT_DIR, "data", "live_feed.json")
         tenders_migrated = 0
-        if os.path.exists(live_feed_file):
+        if db.query(TenderModel).count() > 0:
+            print("[+] Tender records already exist; skipping seed import.")
+        elif os.path.exists(live_feed_file):
             print(f"[*] Reading tenders from {live_feed_file}...")
             with open(live_feed_file, "r", encoding="utf-8") as f:
                 feed_data = json.load(f)
@@ -49,7 +51,9 @@ def migrate_all():
         # 3. Migrate Users
         users_file = os.path.join(ROOT_DIR, "data", "users.json")
         users_migrated = 0
-        if os.path.exists(users_file):
+        if db.query(UserModel).count() > 0:
+            print("[+] User records already exist; skipping seed import.")
+        elif os.path.exists(users_file):
             print(f"[*] Reading users from {users_file}...")
             with open(users_file, "r", encoding="utf-8") as f:
                 users_data = json.load(f)
@@ -68,7 +72,9 @@ def migrate_all():
         # 4. Migrate Awards & Cartel Telemetry
         awards_file = os.path.join(ROOT_DIR, "data", "awards_archive.json")
         awards_migrated = 0
-        if os.path.exists(awards_file):
+        if db.query(BiddingSyndicateModel).count() > 0:
+            print("[+] Syndicate records already exist; skipping seed import.")
+        elif os.path.exists(awards_file):
             print(f"[*] Reading cartel & awards telemetry from {awards_file}...")
             with open(awards_file, "r", encoding="utf-8") as f:
                 awards_data = json.load(f)

@@ -34,9 +34,9 @@ class TenderStore {
       selectedCategory: 'ALL',
       activeTab: 'overview-view',
       selectedTender: null,
-      isAuthenticated: !!savedToken || true,
-      authToken: savedToken || 'demo_jwt_session_token_2026',
-      currentUser: savedUser || defaultUser,
+      isAuthenticated: !!savedToken,
+      authToken: savedToken || null,
+      currentUser: savedUser || { id: 'guest', name: 'Guest User', role: 'Signed Out', initials: 'GU', clearance: 'Public View', email: '' },
       userProfiles: [
         { id: 'usr_admin', name: 'Enterprise Executive', role: 'Managing Director & Lead', initials: 'EE', clearance: 'Level 4 (Executive)', email: 'admin@tendertrading.gov.bd', agency: 'Tender Trading Inc.' },
         { id: 'usr_02', name: 'Engr. M. A. Karim, FIEB', role: 'Chief Procurement Estimator', initials: 'MK', clearance: 'Level 3 (Senior)', email: 'karim.engr@tendertrading.gov.bd', agency: 'RHD Engineering Division' },
@@ -148,12 +148,12 @@ class TenderStore {
       }
 
       this.state.isAuthenticated = true;
-      this.state.authToken = result.token;
+      this.state.authToken = result.access_token || result.token;
       this.state.currentUser = result.user;
 
       try {
         localStorage.setItem('tenderpulse_auth_user', JSON.stringify(result.user));
-        localStorage.setItem('tenderpulse_auth_token', result.token);
+        localStorage.setItem('tenderpulse_auth_token', result.access_token || result.token);
       } catch (e) {}
 
       this._notify('authChange', { isAuthenticated: true, user: result.user });
@@ -191,12 +191,12 @@ class TenderStore {
           this.state.userProfiles.push(result.user);
         }
         this.state.isAuthenticated = true;
-        this.state.authToken = result.token;
+        this.state.authToken = result.access_token || result.token;
         this.state.currentUser = result.user;
 
         try {
           localStorage.setItem('tenderpulse_auth_user', JSON.stringify(result.user));
-          localStorage.setItem('tenderpulse_auth_token', result.token);
+          localStorage.setItem('tenderpulse_auth_token', result.access_token || result.token);
         } catch (e) {}
 
         this._notify('authChange', { isAuthenticated: true, user: result.user });
@@ -547,4 +547,3 @@ class TenderStore {
 
 // Global Singleton Instance
 window.tenderStore = new TenderStore();
-

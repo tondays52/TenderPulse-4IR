@@ -28,22 +28,26 @@ class TenderPdfParser:
         Extracts tender details and BOQ line items from raw PDF bytes.
         """
         extracted_text = ""
+        page_texts = []
         page_count = 0
 
         if HAS_PYPDF and file_bytes:
             try:
                 reader = pypdf.PdfReader(io.BytesIO(file_bytes))
                 page_count = len(reader.pages)
-                for page in reader.pages[:15]:  # read up to first 15 pages for speed
+                for number, page in enumerate(reader.pages[:15], start=1):  # read up to first 15 pages for speed
                     t = page.extract_text()
                     if t:
                         extracted_text += "\n" + t
+                        page_texts.append({"page": number, "text": t})
             except Exception as e:
                 extracted_text = f"Error reading PDF stream: {str(e)}"
         else:
             extracted_text = "pypdf not available or empty payload."
 
-        return self._extract_structured_fields(extracted_text, filename, page_count)
+        result = self._extract_structured_fields(extracted_text, filename, page_count)
+        result["page_texts"] = page_texts
+        return result
 
     def parse_text_stream(self, text: str, filename: str = "tender_text.txt") -> Dict[str, Any]:
         """

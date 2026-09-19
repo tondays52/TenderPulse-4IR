@@ -729,22 +729,13 @@ class BangladeshGisHeatmap {
     this.currentFilters[filterName] = value;
     this.loadHeatmapData();
   }
-}
 
-// Global Singleton
-window.bangladeshGisHeatmap = new BangladeshGisHeatmap();
-
-window.initBangladeshGisHeatmap = function() {
-  if (window.bangladeshGisHeatmap) {
-    window.bangladeshGisHeatmap.init();
-  }
-};
-
-window.switchCartelViewport = function(mode) {
   connectLiveStream() {
     if (!this.liveEnabled || this._wsRetries >= this._wsMaxRetries) return;
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
-    const url = `${proto}://127.0.0.1:8080/api/ws/cartel/live`;
+    const token = window.localStorage?.getItem("tenderpulse_access_token");
+    const authQuery = token ? `?access_token=${encodeURIComponent(token)}` : "";
+    const url = `${proto}://${window.location.host}/api/ws/cartel/live${authQuery}`;
     try {
       this.ws = new WebSocket(url);
     } catch (e) {
@@ -1031,7 +1022,7 @@ window.switchCartelViewport = function(mode) {
 
   async _toggleStream() {
     try {
-      const token = window.TenderApiService ? window.TenderApiService.token : null;
+      const token = window.localStorage?.getItem("tenderpulse_access_token");
       if (!token) return;
       const res = await fetch("/api/cartel/live/toggle", {
         method: "POST",
@@ -1045,7 +1036,7 @@ window.switchCartelViewport = function(mode) {
 
   async _injectAnomaly() {
     try {
-      const token = window.TenderApiService ? window.TenderApiService.token : null;
+      const token = window.localStorage?.getItem("tenderpulse_access_token");
       if (!token) return;
       // High-threat Dhaka cartel injection
       await fetch("/api/cartel/live/inject", {
@@ -1085,6 +1076,15 @@ window.switchCartelViewport = function(mode) {
     } catch (_) {}
   }
 }
+
+// Global Singleton
+window.bangladeshGisHeatmap = new BangladeshGisHeatmap();
+
+window.initBangladeshGisHeatmap = function() {
+  if (window.bangladeshGisHeatmap) {
+    window.bangladeshGisHeatmap.init();
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Viewport Switcher (external API)

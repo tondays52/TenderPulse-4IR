@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
 from backend.models import (
-    TenderModel, BiddingSyndicateModel, SarAuditModel, UserModel, CorrigendumModel, HistoricalAwardModel
+    TenderModel, BiddingSyndicateModel, SarAuditModel, UserModel, CorrigendumModel, CorrigendumReviewModel, AlertPreferenceModel, TeamAlertPolicyModel, HistoricalAwardModel
 )
 
 
@@ -240,6 +240,94 @@ def get_corrigenda(
     return query.order_by(CorrigendumModel.detected_at.desc()).limit(limit).all()
 
 
+def save_corrigendum_review(
+    db: Session,
+    corrigendum_id: int,
+    reviewer_email: str,
+    status: str,
+    note: Optional[str] = None,
+) -> CorrigendumReviewModel:
+    """Create or update the current operator's review state for an alert."""
+    review = db.query(CorrigendumReviewModel).filter(
+        CorrigendumReviewModel.corrigendum_id == corrigendum_id,
+        CorrigendumReviewModel.reviewer_email == reviewer_email,
+    ).first()
+    if not review:
+        review = CorrigendumReviewModel(
+            corrigendum_id=corrigendum_id,
+            reviewer_email=reviewer_email,
+            status=status,
+            note=note,
+        )
+        db.add(review)
+    else:
+        review.status = status
+        review.note = note
+    db.commit()
+    db.refresh(review)
+    return review
+
+
+def get_alert_preferences(db: Session, user_email: str) -> AlertPreferenceModel:
+    """Return persisted alert settings, creating safe in-app defaults if absent."""
+    preferences = db.query(AlertPreferenceModel).filter(AlertPreferenceModel.user_email == user_email).first()
+    if not preferences:
+        preferences = AlertPreferenceModel(user_email=user_email)
+        db.add(preferences)
+        db.commit()
+        db.refresh(preferences)
+    return preferences
+
+
+def save_alert_preferences(
+    db: Session,
+    user_email: str,
+    agencies_json: str,
+    alert_types_json: str,
+    deadline_window_hours: int,
+    requested_external_channel: str,
+) -> AlertPreferenceModel:
+    preferences = get_alert_preferences(db, user_email)
+    preferences.agencies_json = agencies_json
+    preferences.alert_types_json = alert_types_json
+    preferences.deadline_window_hours = deadline_window_hours
+    preferences.requested_external_channel = requested_external_channel
+    preferences.is_customized = True
+    db.commit()
+    db.refresh(preferences)
+    return preferences
+
+
+def get_team_alert_policy(db: Session) -> TeamAlertPolicyModel:
+    """Return the singleton team policy, creating conservative in-app defaults."""
+    policy = db.get(TeamAlertPolicyModel, 1)
+    if not policy:
+        policy = TeamAlertPolicyModel(id=1)
+        db.add(policy)
+        db.commit()
+        db.refresh(policy)
+    return policy
+
+
+def save_team_alert_policy(
+    db: Session,
+    agencies_json: str,
+    alert_types_json: str,
+    deadline_window_hours: int,
+    requested_external_channel: str,
+    updated_by: str,
+) -> TeamAlertPolicyModel:
+    policy = get_team_alert_policy(db)
+    policy.agencies_json = agencies_json
+    policy.alert_types_json = alert_types_json
+    policy.deadline_window_hours = deadline_window_hours
+    policy.requested_external_channel = requested_external_channel
+    policy.updated_by = updated_by
+    db.commit()
+    db.refresh(policy)
+    return policy
+
+
 def bulk_insert_historical_awards(db: Session, records: List[Dict[str, Any]]) -> int:
     """
     High-speed bulk insertion of historical awards records.
@@ -257,4 +345,3 @@ def count_historical_awards(db: Session, agency: Optional[str] = None) -> int:
     if agency and agency != "ALL":
         q = q.filter(HistoricalAwardModel.agency == agency)
     return q.count()
-

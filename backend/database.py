@@ -5,20 +5,47 @@ SQLAlchemy 2.0 ORM Engine with PostgreSQL & SQLite Multi-Mode Support.
 
 import os
 from typing import Generator
+from urllib.parse import quote
 from sqlalchemy import create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker, Session
+from backend.settings import get_settings
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(ROOT_DIR, "data")
 os.makedirs(DATA_DIR, exist_ok=True)
 
-# Read DATABASE_URL from environment or fallback to local SQLite database
 DEFAULT_SQLITE_PATH = os.path.join(DATA_DIR, "tenderpulse.db")
-DATABASE_URL = os.environ.get("DATABASE_URL", f"sqlite:///{DEFAULT_SQLITE_PATH}")
+
+
+def resolve_database_url() -> str:
+    """Resolve the database URL without exposing credentials in configuration.
+
+    Compose supplies PostgreSQL credentials as separate variables so passwords
+    containing URL-reserved characters (for example ``@`` or ``/``) remain
+    valid. An explicit DATABASE_URL still takes precedence for local tooling.
+    """
+    explicit_url = os.environ.get("DATABASE_URL", "").strip()
+    if explicit_url:
+        return explicit_url
+
+    postgres_host = os.environ.get("POSTGRES_HOST", "").strip()
+    if postgres_host:
+        user = quote(os.environ.get("POSTGRES_USER", "tenderpulse"), safe="")
+        password = quote(os.environ.get("POSTGRES_PASSWORD", ""), safe="")
+        database = quote(os.environ.get("POSTGRES_DB", "tenderpulse"), safe="")
+        port = os.environ.get("POSTGRES_PORT", "5432").strip() or "5432"
+        return f"postgresql+psycopg://{user}:{password}@{postgres_host}:{port}/{database}"
+
+    return f"sqlite:///{DEFAULT_SQLITE_PATH}"
+
+
+DATABASE_URL = resolve_database_url()
 
 # Normalize PostgreSQL schema URI for SQLAlchemy 2.0 if needed
 if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg2://", 1)
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql+psycopg://", 1)
+elif DATABASE_URL.startswith("postgresql://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+psycopg://", 1)
 
 # Configure engine connection arguments based on dialect
 engine_kwargs = {}
@@ -49,6 +76,8 @@ def get_db() -> Generator[Session, None, None]:
 
 def init_db():
     """
-    Initializes database schema and tables.
+    Initializes local development schemas. Production schemas are managed by
+    Alembic; Docker runs ``alembic upgrade head`` before starting FastAPI.
     """
-    Base.metadata.create_all(bind=engine)
+    if get_settings().environment in {"development", "test"}:
+        Base.metadata.create_all(bind=engine)

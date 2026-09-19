@@ -8,8 +8,10 @@ import os
 import json
 import time
 import hashlib
+import hmac
 import secrets
 from typing import Dict, Any, List, Optional
+from backend.settings import get_settings
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 USERS_FILE = os.path.join(DATA_DIR, "users.json")
@@ -64,13 +66,73 @@ DEFAULT_USERS = [
 
 class AuthManager:
     def __init__(self):
+        # Retained only as a one-time import source for existing installations.
         self.users: List[Dict[str, Any]] = []
-        self.active_sessions: Dict[str, Dict[str, Any]] = {}
+        self._migration_complete = False
         self._load_users()
 
     def _hash_password(self, password: str) -> str:
-        salted = f"{password}_tenderpulse_salt".encode('utf-8')
-        return hashlib.sha256(salted).hexdigest()
+        """Create a self-describing PBKDF2-SHA256 password hash."""
+        iterations = 600_000
+        salt = secrets.token_hex(16)
+        digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt.encode("utf-8"), iterations)
+        return f"pbkdf2_sha256${iterations}${salt}${digest.hex()}"
+
+    def _verify_password(self, password: str, stored_hash: str) -> tuple[bool, bool]:
+        """Return (valid, needs_upgrade), including support for legacy seed users."""
+        if stored_hash.startswith("pbkdf2_sha256$"):
+            try:
+                _, iterations, salt, expected = stored_hash.split("$", 3)
+                candidate = hashlib.pbkdf2_hmac(
+                    "sha256", password.encode("utf-8"), salt.encode("utf-8"), int(iterations)
+                ).hex()
+                return hmac.compare_digest(candidate, expected), False
+            except (TypeError, ValueError):
+                return False, False
+
+        # Legacy JSON accounts are upgraded after their next successful login.
+        legacy = hashlib.sha256(f"{password}_tenderpulse_salt".encode("utf-8")).hexdigest()
+        return hmac.compare_digest(legacy, stored_hash), True
+
+    def _db_session(self):
+        from backend.database import SessionLocal, init_db
+        import backend.models  # Ensure all SQLAlchemy models are registered before create_all.
+        init_db()
+        return SessionLocal()
+
+    def _ensure_migrated(self) -> None:
+        """Import legacy users.json records once without overwriting database users."""
+        if self._migration_complete:
+            return
+        db = self._db_session()
+        try:
+            from backend.models import UserModel
+            for user in self.users:
+                email = user.get("email", "").strip().lower()
+                if not email or db.query(UserModel).filter(UserModel.email == email).first():
+                    continue
+                db.add(UserModel(
+                    email=email,
+                    name=user.get("name", "User"),
+                    password_hash=user.get("password_hash", ""),
+                    salt="legacy-json-migration",
+                    role=user.get("role", "Tender Analyst"),
+                    agency=user.get("agency", "Tender Trading Inc."),
+                    is_active=True,
+                ))
+            db.commit()
+            self._migration_complete = True
+        finally:
+            db.close()
+
+    @staticmethod
+    def _to_public_user(user) -> Dict[str, Any]:
+        return {
+            "id": str(user.id), "name": user.name, "email": user.email,
+            "role": user.role, "initials": "".join(part[0] for part in user.name.split()[:2]).upper() or "TP",
+            "clearance": "Level 4 (Executive)" if "admin" in user.role.lower() or "director" in user.role.lower() else "Level 3 (Senior)",
+            "agency": user.agency, "created_at": user.created_at.isoformat() if user.created_at else None,
+        }
 
     def _generate_initials(self, name: str) -> str:
         parts = [p for p in name.replace('.', ' ').split() if p and not p.lower() in ('engr', 'dr', 'fieb', 'pmp', 'adv')]
@@ -90,7 +152,6 @@ class AuthManager:
             except Exception:
                 pass
         self.users = list(DEFAULT_USERS)
-        self._save_users()
 
     def _save_users(self):
         try:
@@ -100,6 +161,10 @@ class AuthManager:
             print(f"[Auth Error] Failed to save users: {e}")
 
     def register(self, name: str, email: str, password: str, role: str = "Tender Analyst", agency: str = "Tender Trading Inc.") -> Dict[str, Any]:
+        if not get_settings().allow_public_registration:
+            raise PermissionError("Self-registration is disabled. Ask an administrator to provision your account.")
+        if len(password) < 12:
+            raise ValueError("Password must contain at least 12 characters.")
         email_clean = email.strip().lower()
         if any(u["email"].lower() == email_clean for u in self.users):
             raise ValueError(f"An account with email '{email_clean}' already exists.")
@@ -112,7 +177,8 @@ class AuthManager:
             "id": user_id,
             "name": name.strip(),
             "email": email_clean,
-            "role": role.strip(),
+            # Public registration must never be able to mint privileged roles.
+            "role": "Tender Analyst",
             "initials": initials,
             "clearance": clearance,
             "agency": agency.strip(),
@@ -120,67 +186,75 @@ class AuthManager:
             "created_at": time.strftime("%Y-%m-%d %H:%M:%S")
         }
 
-        self.users.append(user)
-        self._save_users()
-
-        token = secrets.token_hex(24)
-        user_safe = self._sanitize_user(user)
-        self.active_sessions[token] = {
-            "user": user_safe,
-            "created_at": time.time()
-        }
+        db = self._db_session()
+        try:
+            from backend.models import UserModel
+            db_user = UserModel(
+                email=email_clean, name=user["name"], password_hash=user["password_hash"], salt="pbkdf2-embedded",
+                role=user["role"], agency=user["agency"], is_active=True,
+            )
+            db.add(db_user)
+            db.commit()
+            db.refresh(db_user)
+            user_safe = self._to_public_user(db_user)
+        finally:
+            db.close()
 
         return {
             "status": "SUCCESS",
             "message": f"User account created for {name}",
-            "token": token,
             "user": user_safe
         }
 
     def login(self, email: str, password: str) -> Dict[str, Any]:
         email_clean = email.strip().lower()
-        pw_hash = self._hash_password(password)
-
-        user = next((u for u in self.users if u["email"].lower() == email_clean), None)
-        if not user or user.get("password_hash") != pw_hash:
-            raise ValueError("Invalid email or password.")
-
-        token = secrets.token_hex(24)
-        user_safe = self._sanitize_user(user)
-        self.active_sessions[token] = {
-            "user": user_safe,
-            "created_at": time.time()
-        }
-
-        return {
-            "status": "SUCCESS",
-            "message": f"Welcome back, {user['name']}",
-            "token": token,
-            "user": user_safe
-        }
+        self._ensure_migrated()
+        db = self._db_session()
+        try:
+            from backend.models import UserModel
+            user = db.query(UserModel).filter(UserModel.email == email_clean).first()
+            if not user or not user.is_active:
+                raise ValueError("Invalid email or password.")
+            valid, needs_upgrade = self._verify_password(password, user.password_hash)
+            if not valid:
+                raise ValueError("Invalid email or password.")
+            if needs_upgrade:
+                user.password_hash = self._hash_password(password)
+                user.salt = "pbkdf2-embedded"
+                db.commit()
+                db.refresh(user)
+            user_safe = self._to_public_user(user)
+            return {"status": "SUCCESS", "message": f"Welcome back, {user.name}", "user": user_safe}
+        finally:
+            db.close()
 
     def logout(self, token: Optional[str]) -> Dict[str, Any]:
-        if token and token in self.active_sessions:
-            del self.active_sessions[token]
         return {
             "status": "SUCCESS",
             "message": "Signed out successfully."
         }
 
     def get_current_user(self, token: Optional[str]) -> Optional[Dict[str, Any]]:
-        if token and token in self.active_sessions:
-            return self.active_sessions[token]["user"]
-        if self.users:
-            return self._sanitize_user(self.users[0])
         return None
 
     def get_user_by_email(self, email: str) -> Optional[Dict[str, Any]]:
-        email_clean = email.strip().lower()
-        user = next((u for u in self.users if u["email"].lower() == email_clean), None)
-        return self._sanitize_user(user) if user else None
+        self._ensure_migrated()
+        db = self._db_session()
+        try:
+            from backend.models import UserModel
+            user = db.query(UserModel).filter(UserModel.email == email.strip().lower()).first()
+            return self._to_public_user(user) if user else None
+        finally:
+            db.close()
 
     def list_public_profiles(self) -> List[Dict[str, Any]]:
-        return [self._sanitize_user(u) for u in self.users]
+        self._ensure_migrated()
+        db = self._db_session()
+        try:
+            from backend.models import UserModel
+            return [self._to_public_user(user) for user in db.query(UserModel).filter(UserModel.is_active.is_(True)).all()]
+        finally:
+            db.close()
 
     def _sanitize_user(self, user: Dict[str, Any]) -> Dict[str, Any]:
         return {

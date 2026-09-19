@@ -810,13 +810,23 @@ function initOverviewProposalsTable(miner) {
       const deadline = rawDeadline.length > 11 ? rawDeadline.slice(0, 11) : rawDeadline;
       const location = t.district || t.location || "Dhaka, Bangladesh";
       const docBadge = t.docsAttached !== false ? `<span class="top-stat-pill pill-emerald" style="padding: 0.1rem 0.35rem; font-size: 0.68rem;">✓ Attached</span>` : `<span class="top-stat-pill pill-amber" style="padding: 0.1rem 0.35rem; font-size: 0.68rem;">⏳ Pending</span>`;
+      const sourceKind = t.provenance?.kind || "legacy_unknown";
+      const sourceStyles = {
+        live: ["LIVE", "#047857", "#d1fae5"],
+        cached: ["CACHED", "#1d4ed8", "#dbeafe"],
+        derived: ["DERIVED", "#92400e", "#fef3c7"],
+        synthetic: ["SYNTHETIC", "#b45309", "#ffedd5"],
+        legacy_unknown: ["SOURCE UNKNOWN", "#991b1b", "#fee2e2"]
+      };
+      const [sourceLabel, sourceText, sourceBg] = sourceStyles[sourceKind] || sourceStyles.legacy_unknown;
+      const sourceBadge = `<span title="${escapeHtml((t.provenance?.notes || []).join(' '))}" style="margin-left:6px;padding:1px 5px;border-radius:4px;font-size:0.62rem;font-weight:800;color:${sourceText};background:${sourceBg};">${sourceLabel}</span>`;
 
       return `
         <tr class="${isSelected}" onclick="window.selectProposalRow(this, '${t.tenderId || t.id}')">
           <td><strong>${escapeHtml(t.tenderId || t.id || 'e-GP-2026')}</strong></td>
           <td>
             <div style="font-weight: 700; color: #0f172a;">${escapeHtml(t.title || t.description || 'Infrastructure Development')}</div>
-            <div style="font-size: 0.68rem; color: var(--text-muted);">${escapeHtml(agencyName)} • OTM Works</div>
+            <div style="font-size: 0.68rem; color: var(--text-muted);">${escapeHtml(agencyName)} • OTM Works ${sourceBadge}</div>
           </td>
           <td>${escapeHtml(deadline)}</td>
           <td><strong>${escapeHtml(budgetFormatted)}</strong></td>
@@ -1949,6 +1959,11 @@ function initStdGenerator(stdGen, miner) {
   const stdContractorName = document.getElementById("stdContractorName");
   const stdBidderId = document.getElementById("stdBidderId");
   const stdPreview = document.getElementById("stdDocumentPreview");
+
+  // The current STD module owns its own view.  Keep this legacy initializer
+  // inert when its former markup is not mounted, rather than throwing during
+  // application startup.
+  if (!stdGen || !stdTemplatesList || !stdSelectTender || !stdCompanyName || !stdContractorName || !stdBidderId || !stdPreview) return;
 
   let currentTemplateKey = "submission-letter";
 

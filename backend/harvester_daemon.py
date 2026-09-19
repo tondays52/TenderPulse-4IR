@@ -18,6 +18,7 @@ import requests
 from backend.database import SessionLocal, init_db
 from backend import crud
 from backend.models import TenderModel, CorrigendumModel
+from backend.executive_reporting import ensure_daily_executive_summary
 from backend.egp_live_scraper import EgpLiveScraper
 
 if sys.platform == "win32":
@@ -122,6 +123,7 @@ class HarvesterDaemon:
         with self._lock:
             self.state["status"] = "harvesting"
             self.state["cycle_count"] += 1
+            self.state["last_error"] = None
             self._persist_status()
 
         db = SessionLocal()
@@ -203,9 +205,19 @@ class HarvesterDaemon:
                     self.scraper.sync_to_storage(tenders)
 
                 except Exception as ex:
+                    # A malformed notice must not leave the shared session in a
+                    # failed transaction state for the next agency.
+                    db.rollback()
                     cycle_errors.append(f"{agency}: {str(ex)}")
 
         finally:
+            try:
+                summary, created = ensure_daily_executive_summary(db)
+                if created:
+                    db.commit()
+            except Exception as ex:
+                db.rollback()
+                cycle_errors.append(f"executive summary: {str(ex)}")
             db.close()
 
         now_str = datetime.utcnow().isoformat() + "Z"

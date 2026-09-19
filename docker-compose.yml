@@ -13,16 +13,60 @@ services:
       - SH_CLIENT_SECRET=${SH_CLIENT_SECRET:-}
       - SH_INSTANCE_ID=${SH_INSTANCE_ID:-01a74708-c309-40e7-aacd-e69298313ecc}
       - REDIS_URL=redis://redis:6379/0
+      # Keep credentials out of a URI so URL-reserved password characters are safe.
+      - DATABASE_URL=
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
     volumes:
       - tenderpulse_data:/app/data
+      - tenderpulse_evidence:/app/private_evidence
     networks:
       - tenderpulse_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/health"]
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/health/ready"]
       interval: 15s
       timeout: 5s
       retries: 3
       start_period: 10s
+
+  harvester:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: tenderpulse_harvester
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - HARVEST_HEALTH_MAX_AGE_SEC=${HARVEST_HEALTH_MAX_AGE_SEC:-2100}
+    command: ["python", "-m", "backend.harvester_daemon", "--daemon", "--interval", "${HARVEST_INTERVAL_SEC:-900}", "--limit", "${HARVEST_LIMIT_PER_AGENCY:-5}"]
+    volumes:
+      - tenderpulse_data:/app/data
+    networks:
+      - tenderpulse_net
+    depends_on:
+      app:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "scripts/harvester_healthcheck.py"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 45s
 
   nginx:
     build:
@@ -38,6 +82,11 @@ services:
         condition: service_healthy
     networks:
       - tenderpulse_net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1/api/health/ready >/dev/null 2>&1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
 
   redis:
     image: redis:7-alpine
@@ -45,6 +94,29 @@ services:
     restart: unless-stopped
     volumes:
       - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - tenderpulse_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: tenderpulse_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tenderpulse}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-in-production}
+      POSTGRES_DB: ${POSTGRES_DB:-tenderpulse}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     networks:
       - tenderpulse_net
 
@@ -56,4 +128,8 @@ volumes:
   redis_data:
     driver: local
   tenderpulse_data:
+    driver: local
+  tenderpulse_evidence:
+    driver: local
+  postgres_data:
     driver: local

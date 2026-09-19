@@ -151,6 +151,11 @@ def _synthesize_tender() -> Dict[str, Any]:
         "estimated_cost_cr": cost_cr,
         "award_price_cr": award_cr,
         "work_type": work_type,
+        "provenance": {
+            "kind": "synthetic",
+            "label": "Simulated live-radar event",
+            "notes": ["Generated locally for interface demonstration; not an e-GP award event."],
+        },
         **cartel,
     }
 

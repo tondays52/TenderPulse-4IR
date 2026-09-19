@@ -12,6 +12,7 @@ import jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from backend.auth_manager import auth_manager
+from backend.settings import get_settings
 
 # 3-Tier Enterprise Role Definitions
 ROLE_EXECUTIVE = "Executive / Managing Director"
@@ -22,7 +23,7 @@ ROLE_ADMIN = "Administrator"
 ALL_ROLES = [ROLE_EXECUTIVE, ROLE_ANALYST, ROLE_AUDITOR, ROLE_ADMIN]
 
 # Configuration
-JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "tenderpulse_production_secret_key_change_in_real_vault_4ir")
+JWT_SECRET_KEY = os.environ.get("JWT_SECRET_KEY", "development-only-change-me")
 JWT_ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS256")
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", "60"))
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
@@ -31,6 +32,44 @@ REFRESH_TOKEN_EXPIRE_DAYS = int(os.environ.get("REFRESH_TOKEN_EXPIRE_DAYS", "7")
 _active_refresh_tokens: Dict[str, Dict[str, Any]] = {}
 
 http_bearer = HTTPBearer(auto_error=False)
+
+
+def _register_refresh_token(jti: str, email: str, expires_at: datetime) -> None:
+    """Persist refresh-token state; retain an in-memory fallback for isolated tests."""
+    try:
+        from backend.database import SessionLocal, init_db
+        from backend.models import RefreshTokenModel
+        init_db()
+        db = SessionLocal()
+        try:
+            db.add(RefreshTokenModel(jti=jti, email=email, expires_at=expires_at))
+            db.commit()
+            return
+        finally:
+            db.close()
+    except Exception:
+        _active_refresh_tokens[jti] = {"email": email, "expires_at": expires_at.timestamp()}
+
+
+def _consume_refresh_token(jti: str, email: str) -> bool:
+    """Atomically mark a refresh token used, preventing reuse across restarts."""
+    try:
+        from backend.database import SessionLocal, init_db
+        from backend.models import RefreshTokenModel
+        init_db()
+        db = SessionLocal()
+        try:
+            token = db.query(RefreshTokenModel).filter(RefreshTokenModel.jti == jti).first()
+            if not token or token.email != email or token.revoked_at or token.expires_at < datetime.utcnow():
+                return False
+            token.revoked_at = datetime.utcnow()
+            db.commit()
+            return True
+        finally:
+            db.close()
+    except Exception:
+        token = _active_refresh_tokens.pop(jti, None)
+        return bool(token and token.get("email") == email and token.get("expires_at", 0) > time.time())
 
 
 def normalize_role(role: str) -> str:
@@ -84,12 +123,7 @@ def create_refresh_token(email: str) -> str:
     }
     token = jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
     
-    # Register active JTI
-    _active_refresh_tokens[jti] = {
-        "email": email,
-        "expires_at": expire.timestamp(),
-        "created_at": now.timestamp()
-    }
+    _register_refresh_token(jti, email, expire)
     return token
 
 
@@ -105,12 +139,10 @@ def rotate_refresh_token(refresh_token: str) -> Tuple[str, str, Dict[str, Any]]:
         jti = payload.get("jti")
         email = payload.get("sub")
 
-        # Verify JTI was not revoked or previously consumed
-        if not jti or jti not in _active_refresh_tokens:
+        # Consume the JTI before issuing a replacement; replay attempts fail even
+        # after an application restart because the registry is database-backed.
+        if not jti or not _consume_refresh_token(jti, email):
             raise HTTPException(status_code=401, detail="Refresh token has been revoked or expired")
-
-        # Revoke old refresh token JTI to prevent replay attacks
-        del _active_refresh_tokens[jti]
 
         # Retrieve user profile from auth_manager or database
         user = auth_manager.get_user_by_email(email)
@@ -224,7 +256,7 @@ def require_roles(allowed_roles: List[str], strict: Optional[bool] = None) -> Ca
       Otherwise permits local dev/test traffic with default executive privileges.
     """
     normalized_allowed = [normalize_role(r) for r in allowed_roles]
-    is_strict_env = os.environ.get("STRICT_AUTH", "false").lower() == "true"
+    is_strict_env = get_settings().strict_auth
 
     def role_checker(creds: Optional[HTTPAuthorizationCredentials] = Depends(http_bearer)) -> Dict[str, Any]:
         should_enforce_strict = is_strict_env if strict is None else strict
@@ -270,4 +302,3 @@ def require_roles(allowed_roles: List[str], strict: Optional[bool] = None) -> Ca
         )
 
     return role_checker
-

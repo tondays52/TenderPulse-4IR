@@ -183,6 +183,13 @@ class EgpLiveScraper:
                 "status": "Live" if is_live else "Archived",
                 "source": "e-GP Live Portal (eprocure.gov.bd)",
                 "officialUrl": f"{self.BASE_URL}/resources/common/ViewTender.jsp?id={tender_id}&h=t",
+                "provenance": {
+                    "kind": "live",
+                    "label": "e-GP tender notice parsed from the public portal",
+                    "retrieved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "source_url": f"{self.BASE_URL}/resources/common/ViewTender.jsp?id={tender_id}&h=t",
+                    "notes": ["Financial thresholds are derived from parsed scope and must be verified against the tender document."],
+                },
                 "description": f"Official tender notice mined from eprocure.gov.bd. Issued by {office} under {ministry}."
             }
             items.append(item)
@@ -242,9 +249,16 @@ class EgpLiveScraper:
                 "lastSellingDate": "2026-10-20 17:00",
                 "closingDate": "2026-10-21 13:00",
                 "status": "Live",
-                "source": "e-GP Live Gateway Feed",
+                "source": "Synthetic fallback (e-GP unavailable)",
                 "officialUrl": f"{self.BASE_URL}/resources/common/ViewTender.jsp?id={tender_id}&h=t",
-                "description": f"Verified notice mined from official {agency_info['code']} procurement gazette."
+                "provenance": {
+                    "kind": "synthetic",
+                    "label": "Generated fallback tender",
+                    "retrieved_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                    "source_url": None,
+                    "notes": ["Generated because the e-GP source was unavailable or returned no parseable records. Not an official tender notice."],
+                },
+                "description": f"Synthetic demonstration record for {agency_info['code']}; not an official tender notice."
             })
         return items
 

@@ -248,7 +248,7 @@ pip install -r requirements.txt
 Copy-Item .env.example .env
 # Edit .env: set SENTINEL_HUB_CLIENT_ID, SENTINEL_HUB_CLIENT_SECRET, JWT_SECRET_KEY
 
-# 4. Initialize & seed database
+# 4. Initialize & seed database (development SQLite)
 python scripts/migrate_json_to_db.py
 python scripts/seed_historical_cartels.py
 
@@ -261,11 +261,77 @@ Navigate to **http://127.0.0.1:8080** → the GIS Cartel Radar begins streaming 
 ### Option B — Docker Compose (Full Production Stack)
 
 ```bash
+# Copy .env.example to .env and set a long JWT_SECRET_KEY, a strong
+# POSTGRES_PASSWORD, and explicit public HTTPS origin(s) in CORS_ORIGINS.
+python scripts/validate_production_config.py
 docker compose up -d --build
-# App + Nginx reverse proxy + PostgreSQL
+# App runs `alembic upgrade head` before FastAPI starts.
+# On a fresh persistent volume, bundled legacy data is imported once into PostgreSQL.
+# App + Nginx reverse proxy + Redis + PostgreSQL
 ```
 
 Access the hardened terminal at **http://localhost**.
+
+The deployment preflight rejects placeholder or short secrets, wildcard/local-only
+CORS settings, disabled strict authentication, and public registration in production.
+It reports setting names only and never prints secret values.
+
+### First administrator
+
+Set `BOOTSTRAP_ADMIN_EMAIL` and `BOOTSTRAP_ADMIN_PASSWORD` (16+ characters) in
+your local `.env`, then run the following once. The password is hashed locally
+and is never printed:
+
+```bash
+docker compose exec -T app python scripts/bootstrap_admin.py
+```
+
+The command refuses to overwrite an existing account. Review seeded accounts
+before disabling or deleting them.
+
+### Backups, recovery, and monitoring
+
+Create a PostgreSQL backup with a SHA-256 manifest, then verify it by restoring
+to a disposable database:
+
+```powershell
+.\scripts\backup_postgres.ps1 -RetentionDays 14
+.\scripts\verify_postgres_backup.ps1 -BackupPath .\backups\<backup-file>.dump
+```
+
+Schedule daily backup plus readiness monitoring on Windows:
+
+```powershell
+.\scripts\register_daily_maintenance_task.ps1 -Time 02:30 -RetentionDays 14
+```
+
+`/api/health/ready` checks the live database connection and is used by the app
+and Nginx health checks. Request logs are JSON events with request IDs and do
+not include query strings or credentials.
+
+## Phase 1 — Operational ingestion
+
+Compose runs a separate `harvester` service for the rate-limited e-GP ingestion
+loop. Its cycle interval, per-agency limit, and stale-heartbeat threshold are
+configured with `HARVEST_INTERVAL_SEC`, `HARVEST_LIMIT_PER_AGENCY`, and
+`HARVEST_HEALTH_MAX_AGE_SEC`. The worker writes status and corrigendum alerts
+to the persistent data volume, and its health check detects a missing or stale
+heartbeat without affecting the API service.
+
+### Database migrations
+
+Production deployments use Alembic migrations; the container applies pending
+migrations automatically at startup. For an existing local SQLite database that
+was created before migration tracking, back it up, then mark the verified schema
+as the baseline once:
+
+```powershell
+Copy-Item data/tenderpulse.db data/tenderpulse.backup.db
+python -m alembic stamp head
+```
+
+For all subsequent schema updates, run `python -m alembic upgrade head` (or
+redeploy the Compose stack). Do not use `stamp` on a blank or unverified database.
 
 ---
 

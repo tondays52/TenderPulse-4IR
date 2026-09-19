@@ -28,14 +28,19 @@ RUN groupadd -g 1001 tenderpulse && \
 
 # Copy application sources
 COPY backend/ ./backend/
+COPY migrations/ ./migrations/
+COPY scripts/ ./scripts/
+COPY alembic.ini ./
 COPY css/ ./css/
 COPY js/ ./js/
 COPY data/ ./data/
+# Keep an immutable seed copy: the runtime data directory is a named volume.
+COPY data/ ./seed-data/
 COPY index.html .
 COPY LICENSE* ./
 
 # Set proper ownership for non-root user
-RUN chown -R tenderpulse:tenderpulse /app
+RUN mkdir -p /app/private_evidence && chown -R tenderpulse:tenderpulse /app
 
 USER tenderpulse
 
@@ -47,4 +52,4 @@ HEALTHCHECK --interval=20s --timeout=5s --start-period=10s --retries=3 \
     CMD curl -f http://127.0.0.1:8000/api/health || exit 1
 
 # Production entrypoint
-CMD ["uvicorn", "backend.server:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--proxy-headers", "--forwarded-allow-ips=*"]
+CMD ["sh", "-c", "if [ ! -f /app/data/.seeded ]; then cp -a /app/seed-data/. /app/data/ && touch /app/data/.seeded; fi && python scripts/validate_production_config.py && alembic upgrade head && python scripts/migrate_json_to_db.py && exec uvicorn backend.server:app --host 0.0.0.0 --port 8000 --workers 2 --proxy-headers --forwarded-allow-ips=*"]

@@ -25,3 +25,4 @@ Thumbs.db
 .unode/
 *.log
 data/satellite_cache/
+backups/

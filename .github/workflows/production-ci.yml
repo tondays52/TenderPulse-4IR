@@ -6,10 +6,17 @@ on:
   pull_request:
     branches: [main, master]
 
+permissions:
+  contents: read
+
 jobs:
   test-and-validate:
     name: Run Python 3.11 Enterprise Test Matrix
     runs-on: ubuntu-latest
+    env:
+      ENVIRONMENT: test
+      STRICT_AUTH: "true"
+      JWT_SECRET_KEY: ci-only-not-for-production-change-me
 
     services:
       redis:
@@ -33,6 +40,9 @@ jobs:
           pip install -r requirements.txt
           pip install flake8 pytest pytest-cov
 
+      - name: Create deterministic CI configuration
+        run: cp .env.example .env
+
       - name: Lint Codebase & Style Enforcement
         run: |
           # Stop build if there are Python syntax errors or undefined names
@@ -48,6 +58,25 @@ jobs:
 
       - name: Verify Phase 3 (Cryptographic JWT & 3-Tier RBAC)
         run: python test_phase3_security_rbac.py
+
+      - name: Verify database migration baseline
+        run: |
+          db_path="$RUNNER_TEMP/tenderpulse-migration-smoke.db"
+          rm -f "$db_path"
+          DATABASE_URL="sqlite:///$db_path" python -m alembic upgrade head
+          DATABASE_URL="sqlite:///$db_path" python -c "from sqlalchemy import create_engine, inspect; import os; tables=set(inspect(create_engine(os.environ['DATABASE_URL'])).get_table_names()); assert {'alembic_version', 'tenders', 'users', 'refresh_tokens'} <= tables; print('Migration schema verified')"
+
+      - name: Verify data provenance labels
+        run: python test_provenance.py
+
+      - name: Verify production configuration preflight
+        run: python test_production_config.py
+
+      - name: Verify PostgreSQL credential URL encoding
+        run: python test_database_url.py
+
+      - name: Verify administrator bootstrap does not disclose secrets
+        run: python test_admin_bootstrap.py
 
       - name: Verify Phase 4 (Cartel Graph & Multi-Vector Forensics)
         run: python test_phase4_cartel_graph.py

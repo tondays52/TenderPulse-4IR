@@ -12,6 +12,12 @@ import requests
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, ROOT_DIR)
 
+# Keep locally generated test JWTs aligned with the running server's signing
+# configuration. Without this, the test process silently used a different
+# fallback secret than FastAPI.
+from dotenv import load_dotenv
+load_dotenv(os.path.join(ROOT_DIR, ".env"), override=False)
+
 from backend.auth_jwt import (
     create_access_token,
     create_refresh_token,

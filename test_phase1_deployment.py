@@ -19,7 +19,7 @@ def test_requirements_file():
     with open(req_file, "r", encoding="utf-8") as f:
         content = f.read()
     
-    required_packages = ["fastapi", "uvicorn", "pydantic", "z3-solver", "networkx", "pypdf", "requests"]
+    required_packages = ["fastapi", "uvicorn", "pydantic", "z3-solver", "networkx", "pypdf", "requests", "alembic", "psycopg"]
     for pkg in required_packages:
         assert pkg in content, f"Missing required package '{pkg}' in requirements.txt"
     print(f"  [PASS] requirements.txt is clean UTF-8 and contains all {len(required_packages)} core libraries.")
@@ -39,6 +39,9 @@ def test_dockerfile():
     assert "HEALTHCHECK" in content, "Dockerfile must declare HEALTHCHECK"
     assert "EXPOSE 8000" in content, "Dockerfile must expose internal port 8000"
     assert "uvicorn" in content and "backend.server:app" in content, "Dockerfile CMD must start backend.server:app"
+    assert "alembic upgrade head" in content, "Container must apply database migrations before startup"
+    assert "validate_production_config.py" in content, "Container must validate production settings before startup"
+    assert "migrate_json_to_db.py" in content, "Container must bootstrap a fresh production database"
     print("  [PASS] Dockerfile adheres to enterprise container security and multi-stage conventions.")
 
 def test_nginx_configuration():
@@ -68,13 +71,26 @@ def test_docker_compose_schema():
     assert "app" in services, "Missing 'app' service in docker-compose.yml"
     assert "nginx" in services, "Missing 'nginx' service in docker-compose.yml"
     assert "redis" in services, "Missing 'redis' service in docker-compose.yml"
+    assert "postgres" in services, "Missing 'postgres' service in docker-compose.yml"
+    assert "harvester" in services, "Missing independent 'harvester' service in docker-compose.yml"
     
     app_svc = services["app"]
     assert "healthcheck" in app_svc, "App service must define healthcheck"
+    assert "postgres" in app_svc.get("depends_on", {}), "App must wait for PostgreSQL health"
+    app_environment = "\n".join(app_svc.get("environment", []))
+    assert "POSTGRES_HOST=postgres" in app_environment, "App must use the PostgreSQL service host"
+
+    postgres_svc = services["postgres"]
+    assert "healthcheck" in postgres_svc, "PostgreSQL must define a healthcheck"
+
+    harvester_svc = services["harvester"]
+    assert "healthcheck" in harvester_svc, "Harvester must define a healthcheck"
+    assert "backend.harvester_daemon" in " ".join(harvester_svc.get("command", [])), "Harvester service must run the ingestion daemon"
+    assert "--daemon" in harvester_svc.get("command", []), "Harvester service must run continuously, not as a one-off task"
     
     nginx_svc = services["nginx"]
     assert "depends_on" in nginx_svc, "Nginx must depend on app health"
-    print(f"  [PASS] docker-compose.yml is valid YAML defining 3 services: {list(services.keys())}.")
+    print(f"  [PASS] docker-compose.yml is valid YAML defining the app, independent harvester, Nginx, Redis, and PostgreSQL services: {list(services.keys())}.")
 
 def test_environment_configuration():
     print("\n--- 5. Testing Environment Configurations (.env.example & .env) ---")
@@ -87,7 +103,7 @@ def test_environment_configuration():
     with open(env_ex, "r", encoding="utf-8") as f:
         ex_content = f.read()
     
-    for var in ["ENVIRONMENT", "HOST_PORT", "SH_INSTANCE_ID", "DATABASE_URL", "JWT_SECRET_KEY"]:
+    for var in ["ENVIRONMENT", "HOST_PORT", "SH_INSTANCE_ID", "DATABASE_URL", "JWT_SECRET_KEY", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB"]:
         assert var in ex_content, f"Missing {var} in .env.example"
     print("  [PASS] .env.example and active .env provide full production environment configuration.")
 

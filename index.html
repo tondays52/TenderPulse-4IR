@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 
-  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/style.css?v=phase3-20260920">
 </head>
 <body>  <div class="app-layout-wrapper">
     <!-- ====================================================================
@@ -246,6 +246,16 @@
             <span id="aiCanaryText">🛰️ Python 3.11 AI: ONLINE</span>
           </div>
 
+          <div class="corrigendum-notification-wrap">
+            <button class="corrigendum-notification-button" id="btnCorrigendumNotifications" type="button" aria-expanded="false" aria-controls="corrigendumNotificationTray" title="Open corrigendum notifications">
+              <span aria-hidden="true">🔔</span><span class="notification-button-label">Alerts</span><span id="corrigendumUnreadBadge" class="corrigendum-unread-badge" hidden>0</span>
+            </button>
+            <div class="corrigendum-notification-tray" id="corrigendumNotificationTray" hidden>
+              <div class="notification-tray-heading"><div><strong>Team alerts</strong><span id="corrigendumNotificationSummary">Sign in to view alerts</span></div><button type="button" id="btnOpenCorrigendumQueue">Open queue</button></div>
+              <div id="corrigendumNotificationItems" class="notification-tray-items"></div>
+            </div>
+          </div>
+
           <!-- Quick Action Buttons -->
           <button class="btn-secondary" onclick="window.triggerReportExport()">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
@@ -282,6 +292,13 @@
                 </button>
               </div>
             </div>
+
+            <section class="opportunity-ranking-panel" aria-labelledby="opportunityRankingTitle">
+              <div class="opportunity-ranking-heading"><div><div class="eyebrow-label">Phase 2 · Tender prioritization</div><h3 id="opportunityRankingTitle">Priority opportunities</h3><p>Published-data review score, not a win-probability prediction.</p></div><button class="btn-secondary" id="btnRefreshOpportunities" type="button">Refresh ranking</button></div>
+              <div id="opportunityRankingList" class="opportunity-ranking-list"><div class="corrigendum-empty">Sign in to load ranked live tenders.</div></div>
+              <div id="goNoGoResult" class="go-no-go-result" hidden></div>
+            </section>
+            <section class="opportunity-ranking-panel" id="bidReadinessPanel"><div class="opportunity-ranking-heading"><div><div class="eyebrow-label">Phase 2 · Company capability</div><h3>Bid readiness profile</h3><p>Shared inputs for tender-specific Go/No-Go assessment.</p></div></div><div class="readiness-form"><input id="readinessContractor" placeholder="Company name"><input id="readinessTurnover" type="number" min="0" placeholder="Peak turnover (BDT)"><input id="readinessCommitments" type="number" min="0" placeholder="Active commitments (BDT)"><input id="readinessCredit" type="number" min="0" placeholder="Available credit (BDT)"><input id="readinessSimilar" type="number" min="0" placeholder="Largest similar project (BDT)"><input id="readinessEngineers" type="number" min="0" placeholder="Qualified engineers"><button class="btn-primary" id="btnSaveReadinessProfile" type="button">Save profile</button><span id="readinessProfileMessage"></span></div></section>
 
             <!-- Top Stat Strip: 4 Responsive Metric Cards -->
             <div class="top-stat-strip" id="topStatStrip">
@@ -1020,6 +1037,75 @@
         </button>
       </div>
 
+      <section class="corrigendum-review-panel" aria-labelledby="corrigendumReviewTitle">
+        <div class="corrigendum-review-heading">
+          <div>
+            <div class="eyebrow-label">Operator action queue</div>
+            <h3 id="corrigendumReviewTitle">Corrigendum review</h3>
+            <p>Deadline and security amendments found by the independent e-GP harvester. Review state is saved per signed-in operator.</p>
+          </div>
+          <button class="btn-secondary" id="btnRefreshCorrigendumQueue" type="button">Refresh queue</button>
+        </div>
+        <details class="alert-preference-panel" id="alertPreferencePanel">
+          <summary>Alert preferences <span id="alertPreferenceStatus">Sign in to personalize</span></summary>
+          <p>Choose what appears in your in-app Alerts bell. Email and webhook choices are saved as future intent only; no external delivery is active.</p>
+          <div class="alert-preference-grid">
+            <fieldset><legend>Agencies <small>None = all agencies</small></legend><div class="alert-agency-options">
+              <label><input type="checkbox" name="alertAgency" value="RHD"> RHD</label><label><input type="checkbox" name="alertAgency" value="LGED"> LGED</label><label><input type="checkbox" name="alertAgency" value="PWD"> PWD</label><label><input type="checkbox" name="alertAgency" value="BWDB"> BWDB</label><label><input type="checkbox" name="alertAgency" value="BREB"> BREB</label><label><input type="checkbox" name="alertAgency" value="EED"> EED</label><label><input type="checkbox" name="alertAgency" value="DGHS"> DGHS</label>
+            </div></fieldset>
+            <fieldset><legend>Amendments</legend><div class="alert-preference-stack">
+              <label><input type="checkbox" name="alertType" value="closing_date" checked> Deadline changes</label><label><input type="checkbox" name="alertType" value="tender_security" checked> Tender security changes</label>
+              <label>Deadline window <select id="alertDeadlineWindow"><option value="24">24 hours</option><option value="48">48 hours</option><option value="72" selected>72 hours</option></select></label>
+            </div></fieldset>
+            <fieldset><legend>Delivery preference</legend><div class="alert-preference-stack">
+              <label><input type="radio" name="alertDelivery" value="in_app" checked> In-app only</label><label><input type="radio" name="alertDelivery" value="email"> Email when configured</label><label><input type="radio" name="alertDelivery" value="webhook"> Webhook when configured</label>
+            </div></fieldset>
+          </div>
+          <div class="alert-preference-actions"><button class="btn-primary" id="btnSaveAlertPreferences" type="button">Save preferences</button><span id="alertPreferenceSaveMessage" aria-live="polite"></span></div>
+        </details>
+        <details class="team-alert-policy-panel" id="teamAlertPolicyPanel" hidden>
+          <summary>Administrator: team alert defaults <span id="teamAlertPolicyStatus">Loading policy…</span></summary>
+          <p>These defaults apply to operators who have not saved personal alert preferences. Personal settings always take precedence.</p>
+          <div class="alert-preference-grid">
+            <fieldset><legend>Team agencies <small>None = all agencies</small></legend><div class="alert-agency-options">
+              <label><input type="checkbox" name="teamAlertAgency" value="RHD"> RHD</label><label><input type="checkbox" name="teamAlertAgency" value="LGED"> LGED</label><label><input type="checkbox" name="teamAlertAgency" value="PWD"> PWD</label><label><input type="checkbox" name="teamAlertAgency" value="BWDB"> BWDB</label><label><input type="checkbox" name="teamAlertAgency" value="BREB"> BREB</label><label><input type="checkbox" name="teamAlertAgency" value="EED"> EED</label><label><input type="checkbox" name="teamAlertAgency" value="DGHS"> DGHS</label>
+            </div></fieldset>
+            <fieldset><legend>Team amendment rules</legend><div class="alert-preference-stack">
+              <label><input type="checkbox" name="teamAlertType" value="closing_date" checked> Deadline changes</label><label><input type="checkbox" name="teamAlertType" value="tender_security" checked> Tender security changes</label>
+              <label>Deadline window <select id="teamAlertDeadlineWindow"><option value="24">24 hours</option><option value="48">48 hours</option><option value="72" selected>72 hours</option></select></label>
+            </div></fieldset>
+            <fieldset><legend>Team delivery intent</legend><div class="alert-preference-stack">
+              <label><input type="radio" name="teamAlertDelivery" value="in_app" checked> In-app only</label><label><input type="radio" name="teamAlertDelivery" value="email"> Email when configured</label><label><input type="radio" name="teamAlertDelivery" value="webhook"> Webhook when configured</label>
+            </div></fieldset>
+          </div>
+          <div class="alert-preference-actions"><button class="btn-primary" id="btnSaveTeamAlertPolicy" type="button">Save team defaults</button><span id="teamAlertPolicySaveMessage" aria-live="polite"></span></div>
+        </details>
+        <div class="corrigendum-review-filters">
+          <label>Status
+            <select id="corrigendumStatusFilter">
+              <option value="open">Open</option>
+              <option value="acknowledged">Acknowledged</option>
+              <option value="reviewed">Reviewed</option>
+              <option value="all">All alerts</option>
+            </select>
+          </label>
+          <label>Severity
+            <select id="corrigendumSeverityFilter">
+              <option value="">All priorities</option>
+              <option value="HIGH">High — deadline change</option>
+              <option value="MEDIUM">Medium — security change</option>
+            </select>
+          </label>
+          <label>Agency
+            <input id="corrigendumAgencyFilter" type="search" placeholder="e.g. LGED">
+          </label>
+          <span id="corrigendumQueueSummary" class="corrigendum-queue-summary" aria-live="polite"></span>
+        </div>
+        <div id="corrigendumReviewQueue" class="corrigendum-review-queue" aria-live="polite">
+          <div class="corrigendum-empty">Sign in, then refresh to load your assigned review queue.</div>
+        </div>
+      </section>
+
       <div class="mining-grid">
         <!-- Terminal Card -->
         <div class="terminal-card" style="border-radius: 14px; overflow: hidden; border: 1px solid #1e293b; box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);">
@@ -1671,6 +1757,52 @@
       </div>
 
       <!-- Live Interactive Bid Preparation & Submission Pipeline Dossier -->
+      <section class="shared-pipeline-board" aria-labelledby="sharedPipelineTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 2 · Shared workflow</div><h3 id="sharedPipelineTitle">Team bid pipeline</h3><p>Server-side ownership, stage, go/no-go decision, internal due date, and working notes.</p></div><button class="btn-secondary" id="btnRefreshSharedPipeline" type="button">Refresh board</button></div>
+        <div id="sharedPipelineSummary" class="shared-pipeline-summary"></div>
+        <div id="sharedPipelineBoard" class="shared-pipeline-grid"><div class="corrigendum-empty">Sign in to view the shared bid pipeline.</div></div>
+      </section>
+      <section class="shared-preparation-panel" aria-labelledby="sharedPreparationTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 2 · Team execution</div><h3 id="sharedPreparationTitle">Shared preparation checklist</h3><p>Assign the actual bid-preparation work, track progress, and record blockers for each pipeline tender.</p></div></div>
+        <div class="shared-preparation-controls"><label>Pipeline tender<select id="preparationTaskTenderSelect"></select></label><label>New task<input id="preparationTaskTitle" type="text" maxlength="512" placeholder="e.g. Collect tender security"></label><label>Owner email<input id="preparationTaskOwner" type="email" maxlength="256" placeholder="teammate@example.com"></label><label>Task due<input id="preparationTaskDueDate" type="datetime-local"></label><label class="task-required-toggle"><input id="preparationTaskRequired" type="checkbox" checked> Required for submission</label><button class="btn-primary" id="btnAddPreparationTask" type="button">Add task</button></div>
+        <div id="sharedPreparationTaskList" class="shared-preparation-list"><div class="corrigendum-empty">Sign in to manage shared preparation tasks.</div></div>
+      </section>
+      <section class="submission-readiness-panel" aria-labelledby="submissionReadinessTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 2 · Release control</div><h3 id="submissionReadinessTitle">Submission readiness gate</h3><p>Server-enforced checks required before a pipeline tender can move to Submitted.</p></div><div><select id="submissionReadinessTenderSelect" aria-label="Select tender for submission readiness"></select><button class="btn-secondary" id="btnRefreshSubmissionReadiness" type="button">Check readiness</button></div></div>
+        <div id="submissionReadinessChecks" class="submission-readiness-checks"><div class="corrigendum-empty">Sign in to check submission readiness.</div></div>
+      </section>
+      <section class="submission-approval-panel" aria-labelledby="submissionApprovalTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 2 · Authorized sign-off</div><h3 id="submissionApprovalTitle">Submission approval</h3><p>Executive or Admin approval is required after readiness checks pass. Approval expires when bid evidence or readiness changes.</p></div><div><select id="submissionApprovalTenderSelect" aria-label="Select tender for submission approval"></select><button class="btn-secondary" id="btnDownloadSubmissionPack" type="button" disabled>Download final pack</button></div></div>
+        <div id="submissionApprovalStatus" class="submission-approval-status"><div class="corrigendum-empty">Sign in to view submission approval.</div></div>
+        <div id="submissionApprovalControls" class="submission-approval-controls" hidden><label>Approval note<textarea id="submissionApprovalNote" maxlength="1000" placeholder="Optional approval or rejection note"></textarea></label><div><button class="btn-primary" id="btnApproveSubmission" type="button">Approve submission</button><button class="btn-secondary" id="btnRejectSubmission" type="button">Reject submission</button></div></div>
+      </section>
+      <section class="bid-outcome-panel" aria-labelledby="bidOutcomeTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 2 · Learning loop</div><h3 id="bidOutcomeTitle">Post-submission outcome</h3><p>Record the submitted reference, win or loss result, contract value, and lessons for future bids.</p></div><select id="bidOutcomeTenderSelect" aria-label="Select tender for bid outcome"></select></div>
+        <div id="bidOutcomeStatus" class="bid-outcome-status"><div class="corrigendum-empty">Sign in to record outcomes.</div></div>
+        <div id="bidOutcomeControls" class="bid-outcome-controls" hidden><label>Status<select id="bidOutcomeValue"><option value="submitted">Submitted</option><option value="won">Won</option><option value="lost">Lost</option></select></label><label>Submission reference<input id="bidOutcomeReference" maxlength="256" placeholder="e-GP submission reference"></label><label>Submitted at<input id="bidOutcomeSubmittedAt" type="datetime-local"></label><label>Outcome date<input id="bidOutcomeDate" type="datetime-local"></label><label>Awarded value (BDT)<input id="bidOutcomeValueBdt" type="number" min="0" step="0.01" placeholder="Required for win"></label><label class="outcome-wide">Lessons learned<textarea id="bidOutcomeLessons" maxlength="4000" placeholder="Pricing, eligibility, timing, competitor, or document lessons for the next bid"></textarea></label><button class="btn-primary" id="btnSaveBidOutcome" type="button">Save outcome</button></div>
+      </section>
+      <section class="outcome-learning-panel" aria-labelledby="outcomeLearningTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 3 · Operational reporting</div><h3 id="outcomeLearningTitle">Win/loss learning</h3><p>Decisioned win rate excludes submissions that are still awaiting an award decision. Values and lessons come only from recorded outcomes.</p></div><div><button class="btn-secondary" id="btnExportOutcomeLearning" type="button">Export CSV</button><button class="btn-secondary" id="btnRefreshOutcomeLearning" type="button">Refresh dashboard</button></div></div>
+        <div id="outcomeLearningKpis" class="outcome-learning-kpis"><div class="corrigendum-empty">Sign in to view recorded outcomes.</div></div>
+        <div class="outcome-learning-grid"><div><h4>Performance by agency</h4><div id="outcomeLearningAgencies" class="outcome-learning-agencies"></div></div><div><h4>Latest lessons</h4><div id="outcomeLearningLessons" class="outcome-learning-lessons"></div></div></div>
+      </section>
+      <section class="executive-summary-panel" aria-labelledby="executiveSummaryTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 3 · Daily briefing</div><h3 id="executiveSummaryTitle">Executive operating summary</h3><p>One in-app summary is generated daily by the background worker. It highlights current pipeline health and work needing attention.</p></div><div><button class="btn-secondary" id="btnGenerateExecutiveSummary" type="button" hidden>Generate now</button><button class="btn-secondary" id="btnRefreshExecutiveSummary" type="button">Refresh briefing</button></div></div>
+        <div id="executiveSummaryContent" class="executive-summary-content"><div class="corrigendum-empty">Sign in with an authorized role to view the daily briefing.</div></div>
+      </section>
+      <section class="executive-summary-panel" aria-labelledby="auditGovernanceTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 3 · Governance</div><h3 id="auditGovernanceTitle">Audit and retention controls</h3><p>Review shared bid-workflow history and the configured retention window. Automated deletion is disabled.</p></div><div><button class="btn-secondary" id="btnExportBidAudit" type="button">Export audit CSV</button><button class="btn-secondary" id="btnRefreshBidAudit" type="button">Refresh audit</button></div></div>
+        <div id="bidAuditGovernanceContent" class="executive-summary-content"><div class="corrigendum-empty">Sign in with an authorized role to view audit controls.</div></div>
+      </section>
+      <section class="outcome-learning-panel" aria-labelledby="teamWorkloadTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 3 · Team operations</div><h3 id="teamWorkloadTitle">Team workload</h3><p>Current preparation-task ownership and delivery risk. Counts reflect recorded shared tasks, not individual productivity scores.</p></div><button class="btn-secondary" id="btnRefreshTeamWorkload" type="button">Refresh workload</button></div>
+        <div id="teamWorkloadContent" class="outcome-learning-agencies"><div class="corrigendum-empty">Sign in with an authorized role to view team workload.</div></div>
+      </section>
+      <section class="outcome-learning-panel"><div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 4 · Document review</div><h3>Source-backed requirements</h3><p>Upload a tender PDF or paste text, then review explicit clauses before creating required tasks.</p></div></div><div class="shared-preparation-controls"><label>Pipeline tender<select id="documentRequirementTender"></select></label><label>PDF<input id="documentRequirementPdf" type="file" accept="application/pdf"></label><label class="outcome-wide">Tender text<textarea id="documentRequirementText" placeholder="Paste tender/TDS text here"></textarea></label><button class="btn-primary" id="btnExtractDocumentRequirements" type="button">Extract clauses</button></div><div id="documentRequirementResults" class="outcome-learning-lessons"></div></section>
+      <section class="bid-activity-timeline" aria-labelledby="bidActivityTitle">
+        <div class="shared-pipeline-heading"><div><div class="eyebrow-label">Phase 2 · Accountability</div><h3 id="bidActivityTitle">Team activity timeline</h3><p>Append-only record of shared pipeline decisions and preparation-task changes.</p></div><button class="btn-secondary" id="btnRefreshBidActivity" type="button">Refresh timeline</button></div>
+        <div id="bidActivityTimelineItems" class="bid-activity-items"><div class="corrigendum-empty">Sign in to view team activity.</div></div>
+      </section>
       <div style="background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 14px; padding: 1.5rem; margin-bottom: 1.8rem;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; flex-wrap: wrap; gap: 1rem;">
           <div>
@@ -4545,11 +4677,11 @@
           <form class="auth-form-card" onsubmit="window.handleLoginSubmit(event)">
             <div class="auth-input-group">
               <label for="loginEmail">Enterprise Email Address</label>
-              <input type="email" id="loginEmail" class="auth-input" placeholder="e.g. admin@ditender.gov.bd" required value="admin@ditender.gov.bd">
+              <input type="email" id="loginEmail" class="auth-input" placeholder="name@organization.gov.bd" required autocomplete="username">
             </div>
             <div class="auth-input-group">
               <label for="loginPassword">Password</label>
-              <input type="password" id="loginPassword" class="auth-input" placeholder="••••••••" required value="admin123">
+              <input type="password" id="loginPassword" class="auth-input" placeholder="••••••••••••" required autocomplete="current-password">
             </div>
             <button type="submit" class="auth-submit-btn" id="btnLoginSubmit">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
@@ -4731,9 +4863,24 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 
   <!-- Application Scripts -->
-  <script src="js/services/tenderApi.js"></script>
+  <script src="js/services/tenderApi.js?v=phase3-workload-20260920"></script>
   <script src="js/services/spatialGis.js"></script>
   <script src="js/state.js"></script>
+  <script src="js/corrigendum-review.js?v=phase2-20260920"></script>
+  <script src="js/corrigendum-notifications.js?v=phase2-20260920"></script>
+  <script src="js/opportunity-ranking.js?v=phase2-20260920"></script>
+  <script src="js/bid-readiness-profile.js?v=phase2-20260920"></script>
+  <script src="js/shared-pipeline-board.js?v=phase2-20260920"></script>
+  <script src="js/shared-preparation-tasks.js?v=phase2-20260920"></script>
+  <script src="js/submission-readiness.js?v=phase2-20260920"></script>
+  <script src="js/submission-approval.js?v=phase2-20260920"></script>
+  <script src="js/bid-outcome.js?v=phase2-20260920"></script>
+  <script src="js/outcome-learning-dashboard.js?v=phase3-20260920"></script>
+  <script src="js/executive-summary.js?v=phase3-20260920"></script>
+  <script src="js/audit-governance.js?v=phase3-20260920"></script>
+  <script src="js/team-workload.js?v=phase3-20260920"></script>
+  <script src="js/document-requirements.js?v=phase4-20260920"></script>
+  <script src="js/bid-activity-timeline.js?v=phase2-20260920"></script>
   <script src="js/data.js"></script>
   <script src="js/harvester-3d.js"></script>
   <script src="js/miner.js"></script>
@@ -4773,6 +4920,6 @@
   <script src="js/command-palette.js"></script>
   <script src="js/pdf-ingest.js"></script>
   <script src="js/ceo-showcase.js"></script>
-  <script src="js/app.js"></script>
+  <script src="js/app.js?v=phase2-20260920"></script>
 </body>
 </html>

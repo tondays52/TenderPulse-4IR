@@ -399,7 +399,12 @@ class SentinelHubPipeline:
 
         result = {
             "status": "SUCCESS",
-            "source": "live_gateway_process_api",
+            "source": "deterministic_sar_simulation",
+            "provenance": {
+                "kind": "synthetic",
+                "label": "Deterministic SAR simulation",
+                "notes": ["This response is generated locally and is not a Copernicus Sentinel processing result."],
+            },
             "cache_hit": False,
             "tender_id": tender_id,
             "bbox": bbox,

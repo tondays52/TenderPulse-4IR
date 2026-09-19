@@ -23,11 +23,12 @@ const TenderApiService = {
         const token = (typeof localStorage !== 'undefined') ? localStorage.getItem('tenderpulse_access_token') : null;
         const authHeader = token ? { 'Authorization': `Bearer ${token}` } : {};
 
+        const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
         const fetchOptions = {
           ...options,
           headers: {
             'Accept': 'application/json',
-            'Content-Type': 'application/json',
+            ...(isFormData ? {} : { 'Content-Type': 'application/json' }),
             ...authHeader,
             ...(options.headers || {})
           }
@@ -92,6 +93,50 @@ const TenderApiService = {
     // Return local fallback if backend offline
     return window.tenderData || [];
   },
+
+  async getRankedOpportunities(limit = 8) {
+    const res = await this._request(`/api/opportunities/ranked?limit=${encodeURIComponent(limit)}`);
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to load opportunity ranking.');
+  },
+  async assessGoNoGo(tenderId) { const res=await this._request(`/api/opportunities/${encodeURIComponent(tenderId)}/go-no-go`,{method:'POST'}); if(res.success)return res.data; throw new Error(res.error||'Go/No-Go assessment unavailable.'); },
+
+  async saveBidPipelineItem(item) {
+    const res = await this._request('/api/bid-pipeline', { method: 'POST', body: JSON.stringify(item) });
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to save the bid pipeline item.');
+  },
+
+  async getBidPipeline() {
+    const res = await this._request('/api/bid-pipeline');
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to load the shared bid pipeline.');
+  },
+  async getBidActivity(params = {}) { const query=new URLSearchParams(params).toString(); const res=await this._request(`/api/bid-pipeline/activity${query ? `?${query}` : ''}`); if(res.success)return res.data; throw new Error(res.error||'Unable to load shared bid activity.'); },
+  async getSubmissionReadiness(tenderId) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/submission-readiness`); if(res.success)return res.data; throw new Error(res.error||'Unable to load submission readiness.'); },
+  async getSubmissionApproval(tenderId) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/submission-approval`); if(res.success)return res.data; throw new Error(res.error||'Unable to load submission approval.'); },
+  async saveSubmissionApproval(tenderId, approval) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/submission-approval`,{method:'PUT',body:JSON.stringify(approval)}); if(res.success)return res.data; throw new Error(res.error||'Unable to save submission approval.'); },
+  async downloadSubmissionPack(tenderId) { const token=localStorage.getItem('tenderpulse_access_token'); const response=await fetch(`${this.baseUrl}/api/bid-pipeline/${encodeURIComponent(tenderId)}/submission-pack`,{headers:token?{Authorization:`Bearer ${token}`}:{}}); if(!response.ok) throw new Error('Final submission pack is unavailable until readiness and approval are current.'); const blob=await response.blob(); const disposition=response.headers.get('content-disposition')||''; const match=disposition.match(/filename="?([^";]+)"?/i); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=match?.[1]||'submission-pack.zip'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(link.href); },
+  async getBidOutcome(tenderId) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/outcome`); if(res.success)return res.data; throw new Error(res.error||'Unable to load bid outcome.'); },
+  async saveBidOutcome(tenderId, outcome) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/outcome`,{method:'PUT',body:JSON.stringify(outcome)}); if(res.success)return res.data; throw new Error(res.error||'Unable to save bid outcome.'); },
+  async getBidOutcomeLearningDashboard() { const res=await this._request('/api/bid-outcomes/learning-dashboard'); if(res.success)return res.data; throw new Error(res.error||'Unable to load win/loss learning data.'); },
+  async downloadBidOutcomeLearningReport() { const token=localStorage.getItem('tenderpulse_access_token'); const response=await fetch(`${this.baseUrl}/api/bid-outcomes/learning-report.csv`,{headers:token?{Authorization:`Bearer ${token}`}:{}}); if(!response.ok) throw new Error('Unable to export the win/loss report.'); const blob=await response.blob(); const disposition=response.headers.get('content-disposition')||''; const match=disposition.match(/filename="?([^";]+)"?/i); const link=document.createElement('a'); const objectUrl=URL.createObjectURL(blob); link.href=objectUrl; link.download=match?.[1]||'tenderpulse-win-loss-report.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(objectUrl); },
+  async getExecutiveKpiSummary() { const res=await this._request('/api/executive-kpis/daily-summary'); if(res.success)return res.data; throw new Error(res.error||'Unable to load the executive briefing.'); },
+  async generateExecutiveKpiSummary() { const res=await this._request('/api/executive-kpis/daily-summary/generate',{method:'POST'}); if(res.success)return res.data; throw new Error(res.error||'Unable to generate the executive briefing.'); },
+  async getBidAuditReport() { const res=await this._request('/api/governance/audit-report'); if(res.success)return res.data; throw new Error(res.error||'Unable to load audit report.'); },
+  async downloadBidAuditReport() { const token=localStorage.getItem('tenderpulse_access_token'); const response=await fetch(`${this.baseUrl}/api/governance/audit-report.csv`,{headers:token?{Authorization:`Bearer ${token}`}:{}}); if(!response.ok) throw new Error('Unable to export audit report.'); const blob=await response.blob(); const objectUrl=URL.createObjectURL(blob); const link=document.createElement('a'); link.href=objectUrl; link.download='tenderpulse-bid-audit.csv'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(objectUrl); },
+  async getTeamWorkload() { const res=await this._request('/api/team-workload'); if(res.success)return res.data; throw new Error(res.error||'Unable to load team workload.'); },
+  async extractDocumentRequirements(tenderId, text = '', file = null) { const body=new FormData(); if(file) body.append('file', file); else body.append('text_content', text); const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/document-requirements`,{method:'POST',body}); if(res.success)return res.data; throw new Error(res.error||'Unable to extract document requirements.'); },
+  async createDocumentRequirementTask(tenderId,item) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/document-requirements/create-task`,{method:'POST',body:JSON.stringify(item)}); if(res.success)return res.data; throw new Error(res.error||'Unable to create requirement task.'); },
+  async reviewDocumentRequirement(id,status) { const res=await this._request(`/api/document-requirements/${encodeURIComponent(id)}/review`,{method:'PATCH',body:JSON.stringify({status})}); if(res.success)return res.data; throw new Error(res.error||'Unable to review requirement.'); },
+  async getBidPreparationTasks(tenderId) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/tasks`); if(res.success)return res.data; throw new Error(res.error||'Unable to load shared preparation tasks.'); },
+  async getBidPreparationTaskReminders() { const res=await this._request('/api/bid-pipeline/task-reminders'); if(res.success)return res.data; throw new Error(res.error||'Unable to load shared task reminders.'); },
+  async uploadBidTaskAttachment(taskId, file) { const body=new FormData(); body.append('file', file); const res=await this._request(`/api/bid-pipeline/tasks/${encodeURIComponent(taskId)}/attachments`,{method:'POST',body}); if(res.success)return res.data; throw new Error(res.error||'Unable to upload evidence.'); },
+  async downloadBidTaskAttachment(attachmentId) { const token=localStorage.getItem('tenderpulse_access_token'); const response=await fetch(`${this.baseUrl}/api/bid-pipeline/task-attachments/${encodeURIComponent(attachmentId)}/download`,{headers:token?{Authorization:`Bearer ${token}`}:{}}); if(!response.ok) throw new Error('Unable to download evidence.'); const blob=await response.blob(); const disposition=response.headers.get('content-disposition')||''; const match=disposition.match(/filename="?([^";]+)"?/i); const link=document.createElement('a'); link.href=URL.createObjectURL(blob); link.download=match?.[1]||'evidence-download'; document.body.appendChild(link); link.click(); link.remove(); URL.revokeObjectURL(link.href); },
+  async addBidPreparationTask(tenderId, task) { const res=await this._request(`/api/bid-pipeline/${encodeURIComponent(tenderId)}/tasks`,{method:'POST',body:JSON.stringify(task)}); if(res.success)return res.data; throw new Error(res.error||'Unable to create preparation task.'); },
+  async updateBidPreparationTask(taskId, task) { const res=await this._request(`/api/bid-pipeline/tasks/${encodeURIComponent(taskId)}`,{method:'PATCH',body:JSON.stringify(task)}); if(res.success)return res.data; throw new Error(res.error||'Unable to update preparation task.'); },
+  async getBidReadinessProfile() { const res=await this._request('/api/bid-readiness/profile'); if(res.success)return res.data; throw new Error(res.error||'Unable to load readiness profile.'); },
+  async saveBidReadinessProfile(profile) { const res=await this._request('/api/bid-readiness/profile',{method:'PUT',body:JSON.stringify(profile)}); if(res.success)return res.data; throw new Error(res.error||'Unable to save readiness profile.'); },
 
   /**
    * Run Microsoft Z3 SMT Formal Legal Prover (PPR-2008 / CPTU Rules 39/40)
@@ -291,6 +336,26 @@ const TenderApiService = {
     };
   },
 
+  // Compatibility aliases retained while older UI modules are migrated.
+  async fetchSamplePdfBoq() {
+    return this.getSamplePdfBoq();
+  },
+
+  async triggerLiveMine(agency = 'LGED', keyword = '', limit = 5) {
+    return this.liveMine(agency, keyword || null, limit);
+  },
+
+  async parsePdf(formData) {
+    const token = typeof localStorage !== 'undefined' ? localStorage.getItem('tenderpulse_access_token') : null;
+    const response = await fetch(`${this.baseUrl}/api/pdf/parse`, {
+      method: 'POST',
+      headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      body: formData
+    });
+    if (!response.ok) throw new Error(`PDF parsing failed (${response.status})`);
+    return response.json();
+  },
+
   /**
    * Live mine targeted tenders directly from eprocure.gov.bd
    */
@@ -338,6 +403,61 @@ const TenderApiService = {
     const res = await this._request(endpoint);
     if (res.success) return res.data;
     return { status: "SUCCESS", count: 0, corrigenda: [] };
+  },
+
+  /**
+   * Fetch the signed-in operator's actionable corrigendum review queue.
+   */
+  async getCorrigendumReviewQueue(filters = {}) {
+    const params = new URLSearchParams();
+    Object.entries(filters).forEach(([key, value]) => {
+      if (value) params.set(key, value);
+    });
+    const res = await this._request(`/api/corrigenda/review-queue?${params.toString()}`);
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to load the corrigendum review queue.');
+  },
+
+  /**
+   * Persist an acknowledgement or completed review for the current user.
+   */
+  async reviewCorrigendum(corrigendumId, status, note = '') {
+    const res = await this._request(`/api/corrigenda/${encodeURIComponent(corrigendumId)}/review`, {
+      method: 'POST',
+      body: JSON.stringify({ status, note })
+    });
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to update the corrigendum review.');
+  },
+
+  async getAlertPreferences() {
+    const res = await this._request('/api/alerts/preferences');
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to load alert preferences.');
+  },
+
+  async saveAlertPreferences(preferences) {
+    const res = await this._request('/api/alerts/preferences', {
+      method: 'PUT',
+      body: JSON.stringify(preferences)
+    });
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to save alert preferences.');
+  },
+
+  async getTeamAlertPolicy() {
+    const res = await this._request('/api/alerts/team-policy');
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to load team alert defaults.');
+  },
+
+  async saveTeamAlertPolicy(policy) {
+    const res = await this._request('/api/alerts/team-policy', {
+      method: 'PUT',
+      body: JSON.stringify(policy)
+    });
+    if (res.success) return res.data;
+    throw new Error(res.error || 'Unable to save team alert defaults.');
   },
 
 

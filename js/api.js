@@ -227,3 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
   TenderPulseAPI.checkHealth();
   setInterval(() => TenderPulseAPI.checkHealth(), 10000);
 });
+
+// services/tenderApi.js is the canonical client.  This legacy file remains
+// loaded for older modules, but must not replace the authenticated client.
+if (window.TenderApiService) {
+  window.TenderPulseAPI = window.TenderApiService;
+}
