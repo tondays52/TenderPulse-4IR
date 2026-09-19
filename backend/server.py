@@ -515,18 +515,62 @@ def verify_cptu_rules(
 @app.post("/api/cartel/analyze")
 def analyze_cartel_network(
     payload: Optional[Dict[str, Any]] = None,
+    dataset: Optional[str] = None,
+    limit: Optional[int] = 50000,
+    agency: Optional[str] = None,
+    year: Optional[int] = None,
+    division: Optional[str] = None,
     current_user: Dict[str, Any] = Depends(require_roles([ROLE_AUDITOR, ROLE_ADMIN]))
 ):
     """
     Constructs bipartite co-bidding network and analyzes syndicate rotation,
-    cover-bidding frequency, and collusive cliques.
+    cover-bidding frequency, and collusive cliques across live or 50,000+ historical tenders.
     """
     try:
+        ds_mode = (dataset or (payload.get("dataset") if payload else None) or "").lower()
+        use_historical = (ds_mode in ("historical", "hist", "archive", "50k") or (payload.get("historical") if payload else False))
+
+        if use_historical:
+            req_agency = agency or (payload.get("agency") if payload else None)
+            req_year = year or (payload.get("year") if payload else None)
+            req_div = division or (payload.get("division") if payload else None)
+            req_limit = limit or (payload.get("limit") if payload else 50000)
+            return cartel_engine.analyze_large_scale_historical(
+                limit=req_limit,
+                agency=req_agency,
+                year=req_year,
+                division=req_div
+            )
+
         tenders = payload.get("tenders", None) if payload else None
         result = cartel_engine.analyze_bidding_syndicate(tenders)
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Cartel Radar exception: {str(e)}")
+
+
+@app.get("/api/cartel/historical-summary")
+def get_cartel_historical_summary(
+    current_user: Dict[str, Any] = Depends(require_roles([ROLE_ANALYST, ROLE_EXECUTIVE, ROLE_AUDITOR, ROLE_ADMIN]))
+):
+    """
+    Fast pre-aggregated summary metadata for the 50,000+ multi-year historical cartel dataset.
+    """
+    try:
+        summary_path = os.path.join(ROOT_DIR, "data", "awards_archive_summary.json")
+        if os.path.exists(summary_path):
+            with open(summary_path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        report = cartel_engine.analyze_large_scale_historical()
+        return {
+            "total_tenders": report["total_tenders_analyzed"],
+            "flagged_tenders": report["flagged_collusive_tenders"],
+            "market_integrity_score": report["market_integrity_score"],
+            "syndicates_count": len(report["detected_syndicates"]),
+            "vector_counts": report["forensic_vectors"].get("vector_counts", {})
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Cartel summary exception: {str(e)}")
 
 
 @app.post("/api/sar/audit")

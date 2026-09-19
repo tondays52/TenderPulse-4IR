@@ -108,3 +108,30 @@ class CorrigendumModel(Base):
     reason = Column(String(512), nullable=True)
     detected_at = Column(DateTime, default=datetime.utcnow)
 
+
+class HistoricalAwardModel(Base):
+    __tablename__ = "historical_awards"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    tender_id = Column(String(64), unique=True, index=True, nullable=False)
+    agency = Column(String(128), index=True, nullable=False)
+    division = Column(String(64), index=True, nullable=True)
+    district = Column(String(64), index=True, nullable=True)
+    year = Column(Integer, index=True, nullable=False)
+    procurement_type = Column(String(64), default="Works")
+    title = Column(String(512), nullable=True)
+    estimated_cost = Column(Float, default=0.0)
+    winning_contractor = Column(String(256), index=True, nullable=False)
+    winning_price = Column(Float, default=0.0)
+    bidders_count = Column(Integer, default=3)
+    bidders_json = Column(Text, nullable=False)
+    has_collusion_flag = Column(Boolean, default=False, index=True)
+    collusion_vector = Column(String(128), nullable=True)  # GUARANTEE / ADDRESS / COVER_BID / ROTATIONAL / CLEAN
+    syndicate_name = Column(String(256), index=True, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    __table_args__ = (
+        Index("ix_hist_agency_year", "agency", "year"),
+        Index("ix_hist_collusion_agency", "has_collusion_flag", "agency"),
+    )
+

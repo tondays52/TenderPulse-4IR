@@ -265,13 +265,14 @@
              ==================================================================== -->
         <div id="overview-view" class="tab-view active">
           <!-- Executive Greeting & Stat Strip -->
+          <!-- Executive Greeting & Stat Strip -->
           <div class="executive-hero-section" style="margin-bottom: 1.5rem;">
             <div class="hero-title-row">
               <div>
                 <h2>Good morning, <span id="currentUserName">Enterprise Executive</span>.</h2>
                 <p>
                   TenderPulse 4IR: <span id="execTotalVal" style="font-weight: 700; color: #0f172a;">৳ 1,421,880,000</span> procurement pipeline active,
-                  <span style="font-weight: 700; color: #059669;">94.6% SMT compliance</span> (+0.8 pts WoW); e-GP harvest volume +22% vs baseline.
+                  <span id="execCompliancePct" style="font-weight: 700; color: #059669;">94.6% SMT compliance</span> (+0.8 pts WoW); e-GP harvest volume +22% vs baseline.
                 </p>
               </div>
               <div style="display: flex; gap: 0.5rem;">
@@ -288,12 +289,12 @@
               <div class="top-stat-card" onclick="window.switchTab('auditor-view')">
                 <div class="top-stat-header">SMT Compliance &amp; Auth Rate</div>
                 <div class="top-stat-main-row">
-                  <span class="top-stat-number">94.6%</span>
+                  <span class="top-stat-number" id="statSmtCompliance">94.6%</span>
                   <span class="top-stat-subtext">• <span id="statTotalTenders">18,402</span> e-GP tenders</span>
                 </div>
                 <div class="top-stat-pill pill-emerald">
                   <span class="pill-dot"></span>
-                  <span>+0.8 pts vs last week</span>
+                  <span id="statSmtWoW">+0.8 pts vs last week</span>
                 </div>
               </div>
 
@@ -301,12 +302,12 @@
               <div class="top-stat-card" onclick="window.switchTab('awards-view')">
                 <div class="top-stat-header">Risk / Cartel Drift Rate</div>
                 <div class="top-stat-main-row">
-                  <span class="top-stat-number">5.4%</span>
-                  <span class="top-stat-subtext">• 4 flagged syndicates</span>
+                  <span class="top-stat-number" id="statCartelDrift">5.4%</span>
+                  <span class="top-stat-subtext">• <span id="statFlaggedSyndicates">4 flagged syndicates</span></span>
                 </div>
                 <div class="top-stat-pill pill-amber">
                   <span class="pill-dot"></span>
-                  <span>drift on LGED / RHD bids</span>
+                  <span id="statCartelPillText">drift on LGED / RHD bids</span>
                 </div>
               </div>
 
@@ -314,12 +315,12 @@
               <div class="top-stat-card" onclick="window.switchTab('ecms-view')">
                 <div class="top-stat-header">Settled Execution Volume</div>
                 <div class="top-stat-main-row">
-                  <span class="top-stat-number">৳ 1,390M</span>
-                  <span class="top-stat-subtext">of ৳ 1,500M budget</span>
+                  <span class="top-stat-number" id="statSettledVol">৳ 1,390M</span>
+                  <span class="top-stat-subtext" id="statSettledBudgetSub">of ৳ 1,500M budget</span>
                 </div>
                 <div class="top-stat-pill pill-emerald">
                   <span class="pill-dot"></span>
-                  <span>96% execution complete</span>
+                  <span id="statSettledPctPill">96% execution complete</span>
                 </div>
               </div>
 
@@ -327,12 +328,12 @@
               <div class="top-stat-card" onclick="window.switchTab('auditor-view')">
                 <div class="top-stat-header">Open TDS / BOQ Disputes</div>
                 <div class="top-stat-main-row">
-                  <span class="top-stat-number">1</span>
-                  <span class="top-stat-subtext">• ৳ 1.75M penalty risk</span>
+                  <span class="top-stat-number" id="statDisputeCount">1</span>
+                  <span class="top-stat-subtext" id="statDisputeRisk">• ৳ 1.75M penalty risk</span>
                 </div>
                 <div class="top-stat-pill pill-rose">
                   <span class="pill-dot"></span>
-                  <span>deadline 2 days</span>
+                  <span id="statDisputeDeadline">deadline 2 days</span>
                 </div>
               </div>
             </div>
@@ -345,7 +346,7 @@
                 <div class="dash-card-header">
                   <div>
                     <h3 class="dash-card-title">Processed &amp; Awarded Pipeline</h3>
-                    <p class="dash-card-sub">21 Jun 2026 • 18,402 tenders • avg tender ৳ 77.27M</p>
+                    <p class="dash-card-sub" id="overviewPipelineSub">21 Jun 2026 • 18,402 tenders • avg tender ৳ 77.27M</p>
                   </div>
                   <select class="table-select" onchange="window.filterPipelineEntity(this.value)" style="padding: 0.2rem 0.5rem; font-size: 0.72rem; border-radius: 9999px; height: 26px; border: 1px solid #cbd5e1; background: #fff; font-weight: 600; color: #0f172a; cursor: pointer;">
                     <option value="ALL">All Procuring Entities</option>
@@ -364,7 +365,7 @@
                     <span class="processed-total-val" id="overviewPipelineTotalVal">৳ 1,421,880,000</span>
                     <span class="top-stat-pill pill-emerald" style="cursor: pointer;" onclick="window.switchTab('auditor-view')" title="Click to view SMT Compliance Details">
                       <span class="pill-dot"></span>
-                      94.6% SMT compliance
+                      <span id="overviewPipelineSmtTxt">94.6% SMT compliance</span>
                     </span>
                     <span style="font-size: 0.75rem; color: var(--text-dim);" id="overviewEntitiesLiveCount">• 8/8 procuring entities live</span>
                   </div>
@@ -377,42 +378,42 @@
                       <span class="pill-dot" style="background: #10b981;"></span>
                       <span>Authorized</span>
                     </div>
-                    <div class="spend-chip-val">৳ 1.50B</div>
+                    <div class="spend-chip-val" id="spendChipAuthorized">৳ 1.50B</div>
                   </div>
                   <div class="spend-chip" onclick="window.switchTab('ecms-view')" style="cursor: pointer;" title="View Settled Contracts in e-CMS Hub">
                     <div class="spend-chip-top">
                       <span class="pill-dot" style="background: #14b8a6;"></span>
                       <span>Settled</span>
                     </div>
-                    <div class="spend-chip-val">৳ 1.39B</div>
+                    <div class="spend-chip-val" id="spendChipSettled">৳ 1.39B</div>
                   </div>
                   <div class="spend-chip" onclick="window.switchTab('bank-view')" style="cursor: pointer;" title="View Bank Guarantees & Escrow Ledger">
                     <div class="spend-chip-top">
                       <span class="pill-dot" style="background: #ef4444;"></span>
                       <span>Refunded</span>
                     </div>
-                    <div class="spend-chip-val">৳ 79.6M</div>
+                    <div class="spend-chip-val" id="spendChipRefunded">৳ 79.6M</div>
                   </div>
                   <div class="spend-chip" onclick="window.switchTab('billing-view')" style="cursor: pointer;" title="View Pending Invoices & RA Bills">
                     <div class="spend-chip-top">
                       <span class="pill-dot" style="background: #f59e0b;"></span>
                       <span>Pending</span>
                     </div>
-                    <div class="spend-chip-val">৳ 31.0M</div>
+                    <div class="spend-chip-val" id="spendChipPending">৳ 31.0M</div>
                   </div>
                 </div>
 
                 <!-- Donut Chart Visualization (140px fixed) -->
                 <div style="display: flex; align-items: center; justify-content: center; gap: 1.5rem; padding: 0.75rem 0; border-top: 1px solid #f1f5f9;">
                   <div style="width: 140px; height: 140px; position: relative; display: flex; align-items: center; justify-content: center; cursor: pointer;" onclick="window.switchTab('compliance-view')" title="View Full Compliance Matrix">
-                    <svg class="donut-svg" width="140" height="140" viewBox="0 0 140 140" style="transform: rotate(-90deg);">
+                    <svg class="donut-svg" id="overviewDonutSvg" width="140" height="140" viewBox="0 0 140 140" style="transform: rotate(-90deg);">
                       <circle cx="70" cy="70" r="54" fill="transparent" stroke="#f1f5f9" stroke-width="14"></circle>
-                      <circle cx="70" cy="70" r="54" fill="transparent" stroke="#10b981" stroke-width="14" stroke-dasharray="339.29" stroke-dashoffset="33.9" stroke-linecap="round"></circle>
-                      <circle cx="70" cy="70" r="54" fill="transparent" stroke="#14b8a6" stroke-width="14" stroke-dasharray="339.29" stroke-dashoffset="180" stroke-linecap="round"></circle>
-                      <circle cx="70" cy="70" r="54" fill="transparent" stroke="#f59e0b" stroke-width="14" stroke-dasharray="339.29" stroke-dashoffset="315" stroke-linecap="round"></circle>
+                      <circle id="donutCircleDirect" cx="70" cy="70" r="54" fill="transparent" stroke="#10b981" stroke-width="14" stroke-dasharray="339.29" stroke-dashoffset="33.9" stroke-linecap="round"></circle>
+                      <circle id="donutCircleFramework" cx="70" cy="70" r="54" fill="transparent" stroke="#14b8a6" stroke-width="14" stroke-dasharray="339.29" stroke-dashoffset="180" stroke-linecap="round"></circle>
+                      <circle id="donutCircleRfq" cx="70" cy="70" r="54" fill="transparent" stroke="#f59e0b" stroke-width="14" stroke-dasharray="339.29" stroke-dashoffset="315" stroke-linecap="round"></circle>
                     </svg>
                     <div style="position: absolute; text-align: center;">
-                      <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a; line-height: 1;">94.6%</div>
+                      <div style="font-size: 1.15rem; font-weight: 800; color: #0f172a; line-height: 1;" id="donutCompliancePct">94.6%</div>
                       <div style="font-size: 0.62rem; font-weight: 600; color: var(--text-dim); text-transform: uppercase; margin-top: 2px;">Compliance</div>
                     </div>
                   </div>
@@ -421,17 +422,17 @@
                     <div style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;" onclick="window.filterOverviewByAgency('ALL')">
                       <span style="width: 8px; height: 8px; border-radius: 50%; background: #10b981;"></span>
                       <span style="font-weight: 600; color: #0f172a;">Direct e-GP Contracts:</span>
-                      <span style="color: var(--text-muted);">68%</span>
+                      <span style="color: var(--text-muted);" id="donutLegendDirect">68%</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;" onclick="window.switchTab('awards-view')">
                       <span style="width: 8px; height: 8px; border-radius: 50%; background: #14b8a6;"></span>
                       <span style="font-weight: 600; color: #0f172a;">Framework Contracts:</span>
-                      <span style="color: var(--text-muted);">26%</span>
+                      <span style="color: var(--text-muted);" id="donutLegendFramework">26%</span>
                     </div>
                     <div style="display: flex; align-items: center; gap: 0.4rem; cursor: pointer;" onclick="window.triggerHarvesterFromOverview()">
                       <span style="width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
                       <span style="font-weight: 600; color: #0f172a;">Emergency RFQ:</span>
-                      <span style="color: var(--text-muted);">6%</span>
+                      <span style="color: var(--text-muted);" id="donutLegendRfq">6%</span>
                     </div>
                   </div>
                 </div>
@@ -444,11 +445,11 @@
                   <span class="target-progress-pill">95.0% target</span>
                 </div>
                 <div class="target-progress-status-row">
-                  <span>0.4 pts to reach your 95.0% institutional target</span>
-                  <span style="font-weight: 700; color: #0f172a;">94.6% / 95.0%</span>
+                  <span id="targetProgressRemaining">0.4 pts to reach your 95.0% institutional target</span>
+                  <span style="font-weight: 700; color: #0f172a;" id="targetProgressRatio">94.6% / 95.0%</span>
                 </div>
                 <div class="target-progress-track">
-                  <div class="target-progress-fill" style="width: 94.6%;"></div>
+                  <div class="target-progress-fill" id="targetProgressFill" style="width: 94.6%;"></div>
                 </div>
               </div>
             </div>
@@ -695,14 +696,14 @@
 
                 <!-- Multi-segment progress bar -->
                 <div class="agency-stacked-bar-wrap">
-                  <div class="agency-stacked-bar">
+                  <div class="agency-stacked-bar" id="overviewAgencyBar">
                     <div class="agency-segment" style="width: 35%; background: #10b981; cursor: pointer;" title="Filter LGED" onclick="window.filterOverviewByAgency('LGED')"></div>
                     <div class="agency-segment" style="width: 28%; background: #3b82f6; cursor: pointer;" title="Filter RHD" onclick="window.filterOverviewByAgency('RHD')"></div>
                     <div class="agency-segment" style="width: 18%; background: #8b5cf6; cursor: pointer;" title="Filter BWDB" onclick="window.filterOverviewByAgency('BWDB')"></div>
                     <div class="agency-segment" style="width: 12%; background: #06b6d4; cursor: pointer;" title="Filter DPHE" onclick="window.filterOverviewByAgency('DPHE')"></div>
                     <div class="agency-segment" style="width: 7%; background: #f59e0b; cursor: pointer;" title="Filter PGCB" onclick="window.filterOverviewByAgency('PGCB')"></div>
                   </div>
-                  <div class="agency-legend-row">
+                  <div class="agency-legend-row" id="overviewAgencyLegend">
                     <div class="agency-legend-item" style="cursor: pointer;" onclick="window.filterOverviewByAgency('LGED')"><span class="agency-legend-dot" style="background: #10b981;"></span><span>LGED (35%)</span></div>
                     <div class="agency-legend-item" style="cursor: pointer;" onclick="window.filterOverviewByAgency('RHD')"><span class="agency-legend-dot" style="background: #3b82f6;"></span><span>RHD (28%)</span></div>
                     <div class="agency-legend-item" style="cursor: pointer;" onclick="window.filterOverviewByAgency('BWDB')"><span class="agency-legend-dot" style="background: #8b5cf6;"></span><span>BWDB (18%)</span></div>
@@ -724,7 +725,7 @@
                         <th class="col-right">Volume</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody id="overviewAgencyTableBody">
                       <tr onclick="window.filterOverviewByAgency('LGED')" style="cursor: pointer;" title="Filter Active Proposals for LGED">
                         <td><strong>LGED Engineering</strong></td>
                         <td>35.0%</td>

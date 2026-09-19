@@ -7,7 +7,9 @@ import json
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import or_, and_
-from backend.models import TenderModel, BiddingSyndicateModel, SarAuditModel, UserModel, CorrigendumModel
+from backend.models import (
+    TenderModel, BiddingSyndicateModel, SarAuditModel, UserModel, CorrigendumModel, HistoricalAwardModel
+)
 
 
 DISTRICT_COORDS = {
@@ -236,4 +238,23 @@ def get_corrigenda(
     if tender_id:
         query = query.filter(CorrigendumModel.tender_id == tender_id)
     return query.order_by(CorrigendumModel.detected_at.desc()).limit(limit).all()
+
+
+def bulk_insert_historical_awards(db: Session, records: List[Dict[str, Any]]) -> int:
+    """
+    High-speed bulk insertion of historical awards records.
+    """
+    db.bulk_insert_mappings(HistoricalAwardModel, records)
+    db.commit()
+    return len(records)
+
+
+def count_historical_awards(db: Session, agency: Optional[str] = None) -> int:
+    """
+    Returns count of historical awards, optionally filtered by agency.
+    """
+    q = db.query(HistoricalAwardModel)
+    if agency and agency != "ALL":
+        q = q.filter(HistoricalAwardModel.agency == agency)
+    return q.count()
 

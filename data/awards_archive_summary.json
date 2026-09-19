@@ -1,0 +1,52 @@
+{
+  "dataset_version": "50K-Historical-Collusion-Telemetry-v2.0",
+  "generated_at": "2026-09-19 12:03:17 UTC",
+  "total_tenders": 50200,
+  "flagged_tenders": 5488,
+  "clean_tenders": 44712,
+  "collusion_rate_pct": 10.93,
+  "year_range": [
+    2021,
+    2026
+  ],
+  "agencies_covered": [
+    "Roads and Highways Department (RHD)",
+    "Local Government Engineering Department (LGED)",
+    "Bangladesh Water Development Board (BWDB)",
+    "Public Works Department (PWD)",
+    "Department of Public Health Engineering (DPHE)",
+    "Power Grid Company of Bangladesh (PGCB)",
+    "Bangladesh Rural Electrification Board (BREB)",
+    "Education Engineering Department (EED)"
+  ],
+  "divisions_covered": [
+    "Dhaka",
+    "Chattogram",
+    "Rajshahi",
+    "Khulna",
+    "Barishal",
+    "Sylhet",
+    "Rangpur",
+    "Mymensingh"
+  ],
+  "districts_count": 64,
+  "syndicates_injected": 16,
+  "syndicate_names": [
+    "Padma-Jamuna Highway Syndicate",
+    "Northern Road Sector Ring",
+    "Chittagong Coastal Embankment Cartel",
+    "Sylhet Haor Flood Protection Guild",
+    "Barisal River Dredging Alliance",
+    "Rajshahi Urban Infrastructure Syndicate",
+    "Khulna Coastal Salinity Treatment Circle",
+    "Dhaka South Metro Building Cartel",
+    "PGCB High-Voltage Grid Syndicate",
+    "BREB Rural Electrification Ring",
+    "EED Model College & School Ring",
+    "Cox's Bazar Marine Drive Consortium",
+    "Kushtia-Jessore Highway Circle",
+    "North Bengal Deep Tube Well Ring",
+    "Meghna Bridge Approach Syndicate",
+    "Sundarbans Polder Restoration Ring"
+  ]
+}

@@ -259,6 +259,17 @@ const TenderApiService = {
   },
 
   /**
+   * Get 50,000+ Historical Cartel Dataset Summary
+   */
+  async getHistoricalCartelSummary() {
+    const res = await this._request('/api/cartel/historical-summary', {
+      method: 'GET'
+    });
+    if (res.success) return res.data;
+    return null;
+  },
+
+  /**
    * Ingest & parse PDF Tender Schedule / Section 6 BOQ
    */
   async getSamplePdfBoq() {

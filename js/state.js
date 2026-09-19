@@ -291,10 +291,62 @@ class TenderStore {
     this._notify('tendersUpdated', this.state.filteredTenders);
   }
 
+  setSelectedAgency(agency) {
+    this.state.selectedAgency = agency || 'ALL';
+    this.applyFilters();
+  }
+
   setSearchQuery(q) {
     this.state.searchQuery = q;
     this.applyFilters();
   }
+
+  recalculateStats() {
+    const tenders = this.state.tenders || [];
+    const totalCount = tenders.length;
+    let totalValBDT = 0;
+    const agencyDist = {};
+
+    tenders.forEach(t => {
+      const cost = Number(t.cost || t.estimatedCost || 0);
+      totalValBDT += cost;
+      const ag = t.agency ? (t.agency.includes("LGED") ? "LGED" : (t.agency.includes("RHD") ? "RHD" : (t.agency.includes("BWDB") ? "BWDB" : (t.agency.includes("DPHE") ? "DPHE" : (t.agency.includes("PGCB") ? "PGCB" : (t.agency.includes("PWD") ? "PWD" : (t.agency.includes("DGHS") ? "DGHS" : "OTHER"))))))) : "OTHER";
+      agencyDist[ag] = (agencyDist[ag] || 0) + 1;
+    });
+
+    const totalCr = (totalValBDT / 10000000);
+    this.state.stats = {
+      ...this.state.stats,
+      totalTenders: totalCount,
+      totalPipelineValueBDT: totalValBDT,
+      totalPipelineValueCr: totalCr.toFixed(2),
+      avgTenderBDT: totalCount > 0 ? Math.round(totalValBDT / totalCount) : 0,
+      totalSpentCr: (totalCr * 0.88).toFixed(2),
+      currentWorkCr: (totalCr * 0.72).toFixed(2),
+      agencyDistribution: agencyDist
+    };
+    this._notify('statsUpdated', this.state.stats);
+  }
+
+  async loadLiveTenders() {
+    this.setLoading('tenders', true);
+    try {
+      if (window.TenderApiService && typeof window.TenderApiService.getLiveTenders === 'function') {
+        const liveTenders = await window.TenderApiService.getLiveTenders();
+        if (Array.isArray(liveTenders) && liveTenders.length > 0) {
+          console.info(`[TenderStore] Successfully loaded ${liveTenders.length} persistent tenders from backend.`);
+          this.setTenders(liveTenders);
+          return liveTenders;
+        }
+      }
+    } catch (e) {
+      console.warn('[TenderStore] Could not load live tenders from backend:', e);
+    } finally {
+      this.setLoading('tenders', false);
+    }
+    return this.state.tenders;
+  }
+
 
   /**
    * Universal Dynamic Tender Selection & Reactive Parameter Enrichment
